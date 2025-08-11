@@ -1,47 +1,33 @@
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css'; // Import the CSS for toast styling
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
+import './index.css';
+import HomePage from './pages/HomePage';
+import Wrapper from './components/Wrapper';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
+import ApplyLeavePage from './pages/ApplyLeavePage';
 
 function App() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
-  };
-
   return (
-    <>
-      {/* ToastContainer will render all the toast notifications */}
- 
-      {/* Your existing layout */}
-      <nav className="flex justify-between items-center p-4 bg-gray-800 text-white">
-        <div>
-          <a href="/" className="mr-4 font-bold hover:text-gray-300">HR Platform</a>
-          <a href="/apply-leave" className="hover:text-gray-300">Apply for Leave</a>
+    <Router>
+      <Wrapper>
+        {/* Top Navbar */}
+        <Navbar />
+
+        {/* Sidebar + Main Content */}
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-4 overflow-auto">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/applyLeave" element={<ApplyLeavePage />} />
+              {/* Add more routes here */}
+            </Routes>
+          </main>
         </div>
-        <button 
-          onClick={handleLogout} 
-          className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
-        >
-          Logout
-        </button>
-      </nav>
-      
-      <main>
-        <Outlet />
-      </main>
-    </>
-  )
+      </Wrapper>
+    </Router>
+  );
 }
 
 export default App;
