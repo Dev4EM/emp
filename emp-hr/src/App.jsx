@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'; // Import the CSS for toast styling
 import './App.css';
 
 function App() {
@@ -8,21 +10,20 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      // If no token exists, redirect to the login page
       navigate('/login');
     }
-    // The dependency array [navigate] ensures this effect runs only when navigate function changes
   }, [navigate]);
 
   const handleLogout = () => {
-    // Remove the token from local storage
     localStorage.removeItem('token');
-    // Redirect to the login page
     navigate('/login');
   };
 
   return (
     <>
+      {/* ToastContainer will render all the toast notifications */}
+ 
+      {/* Your existing layout */}
       <nav className="flex justify-between items-center p-4 bg-gray-800 text-white">
         <div>
           <a href="/" className="mr-4 font-bold hover:text-gray-300">HR Platform</a>
@@ -36,7 +37,6 @@ function App() {
         </button>
       </nav>
       
-      {/* This renders the child routes (HomePage, ApplyLeavePage) if the user is authenticated */}
       <main>
         <Outlet />
       </main>
