@@ -86,5 +86,56 @@ router.put('/me/update', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+// ROUTE: PUT /api/auth/assign-reporting-manager
+// DESC: Assign a reporting manager to a user (Admin functionality)
+router.put('/assign-reporting-manager', auth, async (req, res) => {
+  const { employeeId, managerId } = req.body;
+
+  if (!employeeId) {
+    return res.status(400).json({ message: 'Employee ID is required' });
+  }
+
+  try {
+    // Find the employee
+    const employee = await User.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // If managerId is provided, validate the manager exists and is a team leader
+    if (managerId) {
+      const manager = await User.findById(managerId);
+      if (!manager) {
+        return res.status(404).json({ message: 'Manager not found' });
+      }
+      if (manager.userType !== 'teamleader') {
+        return res.status(400).json({ message: 'Specified manager must be a team leader' });
+      }
+      
+      // Prevent self-assignment
+      if (employeeId === managerId) {
+        return res.status(400).json({ message: 'Employee cannot be their own reporting manager' });
+      }
+    }
+
+    // Update the employee's reporting manager
+    employee.reportingManager = managerId || null;
+    await employee.save();
+
+    // Return the updated employee info
+    const updatedEmployee = await User.findById(employeeId)
+      .populate('reportingManager', 'name email')
+      .select('-password');
+
+    res.json({
+      message: managerId ? 'Reporting manager assigned successfully' : 'Reporting manager removed successfully',
+      employee: updatedEmployee
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
 
 module.exports = router;

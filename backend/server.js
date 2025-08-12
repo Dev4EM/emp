@@ -3,10 +3,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth'); // We will create this next
+const employeeRoutes = require('./routes/employee'); // 1. Import the new routes
+const teamLeaderRoutes = require('./routes/teamleader'); // NEW IMPORT
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin'); // Add this import
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5018;
 
 // Middleware
 app.use(cors());
@@ -14,11 +17,19 @@ app.use(express.json());
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Simple GET route
+app.get('/', (req, res) => {
+  res.send('🚀 EMP Backend is running successfully!');
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/employee', employeeRoutes); // 2. Use the new routes with a prefix
+app.use('/api/teamleader', teamLeaderRoutes); // NEW ROUTE
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
