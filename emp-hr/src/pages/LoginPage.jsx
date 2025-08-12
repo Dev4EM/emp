@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import {loginUser} from '../components/Api';
+
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,22 +19,26 @@ function LoginPage() {
   }, [navigate]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  e.preventDefault();
+  setError('');
+  setSuccess('');
 
-    try {
-      const data = await api.loginUser({ email, password });
-      localStorage.setItem('token', data.token);
-      setSuccess('Login Successful! Redirecting...');
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
-    } catch (err) {
-      setError(err.message || 'Failed to login. Please check your credentials.');
-      console.error('Login failed:', err);
-    }
-  };
+  try {
+    const response = await loginUser({ email, password });
+    const { token } = response; // ✅ Extract token
+
+    if (!token) throw new Error('No token in response');
+
+    localStorage.setItem('token', token);
+    setSuccess('Login Successful! Redirecting...');
+    setTimeout(() => {
+      navigate('/');
+    }, 1500);
+  } catch (err) {
+    setError(err.response?.data?.message || err.message || 'Login failed.');
+    console.error('Login failed:', err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
@@ -41,19 +46,19 @@ function LoginPage() {
       {/* Left Branding Panel */}
       <div className="hidden lg:flex w-1/2 bg-gradient-to-tr from-emerald-900 to-gray-900 p-12 flex-col justify-between">
         <div className="text-2xl font-bold">
-          <span className="text-emerald-400">emp</span> people
+          <span className="text-[#e96101]">EM</span> People
         </div>
         <div>
           <h1 className="text-4xl font-bold leading-snug">
-            Meet Your Everyday <br/> Task Companion
+            Explore the Universe  <br/> of Productivity
           </h1>
           <p className="text-lg mt-4 text-gray-300">
-            Just Ask - chat or speak, AI Does it.
+            Powered by EM People from the Earth
           </p>
         </div>
-        <div className="text-yellow-400 font-bold text-3xl">
-          <h2>HURRY UP! LOG IN</h2>
-          <h2>& START USING NOW</h2>
+        <div className="text-yellow-400 font-bold text-2xl">
+          <h2>LAUNCH YOUR JOURNEY! LOG IN</h2>
+          <h2>AND CONTINUE ORBITING WITH EM PEOPLE</h2>
         </div>
       </div>
 
@@ -63,11 +68,11 @@ function LoginPage() {
           
           {/* Logo and Welcome Text */}
           <div className="text-center">
-            <div className="inline-block p-3 bg-emerald-500 rounded-lg mb-4">
+            <div className="inline-block p-1 bg-black rounded-lg mb-2">
               {/* Placeholder for the square logo */}
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-            </div>
-            <h2 className="text-3xl font-extrabold">Welcome!</h2>
+              <img src="./esroMagicaSpLogo.png" width={100}/>
+             </div>
+            <h2 className="text-3xl font-extrabold">Welcome! To  <span className="text-[#e96101]">EM</span> People</h2>
             <p className="mt-2 text-gray-400">Sign in to continue</p>
           </div>
 

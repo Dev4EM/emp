@@ -3,7 +3,10 @@ import React from 'react';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import useLogout from '../pages/Logout';
+
 const Sidebar = () => {
+  const logout=useLogout();
   return (
 <div className="fixed top-0 left-0 h-full w-24 bg-gray-100 flex flex-col py-4 space-y-6 z-40">
      
@@ -17,9 +20,9 @@ const Sidebar = () => {
           <EditCalendarOutlinedIcon className='text-[#051b56]'/>
         <p className='text-[#051b56]'>Leave</p>
         </a>
-        <a href="#" className="flex fixed bottom-0 flex-col  items-center  ">
+        <a onClick={logout} className="flex fixed bottom-0 flex-col  items-center  ">
           <LogoutOutlinedIcon className='text-[#051b56]'/>
-        <p className='text-[#051b56]'>Logout</p>
+        <p  className='text-[#051b56]'>Logout</p>
         </a>
         
       </nav>
