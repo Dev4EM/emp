@@ -29,13 +29,13 @@ export const getUser = async (credentials) => {
 };
 export const checkIn = async (locationData) => {
   const response = await API.post('/employee/check-in', {
-    checkInLocation: locationData,
+    location: locationData,
   });
   return response.data; // contains attendance and message
 };
 export const checkOut = async (locationData) => {
   const response = await API.post('/employee/check-out', {
-    checkOutLocation: locationData,
+    location: locationData,
   });
   return response.data; // contains updated attendance and message
 };

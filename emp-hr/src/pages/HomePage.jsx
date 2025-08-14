@@ -4,6 +4,7 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import AttendCalen from '../components/AttendCalen';
 import AuthWrapper from '../components/AuthWrapper';
 import { checkIn, checkOut, getUser } from '../components/Api';
+import { useGeolocated } from 'react-geolocated';
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -13,7 +14,16 @@ function HomePage() {
   const [checkOutAddress, setCheckOutAddress] = useState('');
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
-
+const {
+  coords,
+  isGeolocationAvailable,
+  isGeolocationEnabled,
+} = useGeolocated({
+  positionOptions: {
+    enableHighAccuracy: true,
+  },
+  userDecisionTimeout: 5000,
+});
   // Get today's attendance
   const extractTodayAttendance = (attendanceList) => {
     const today = new Date();
@@ -95,29 +105,36 @@ function HomePage() {
   };
 
   // Handle CheckIn with real location and address
-  const handleCheckIn = async () => {
-    try {
-      const position = await getCurrentPosition();
-      const { latitude, longitude } = position.coords;
-
-      const address = await fetchAddress(latitude, longitude);
-
-      const location = {
-        lat: latitude,
-        lng: longitude,
-        address,
-      };
-
-      const response = await checkIn(location);
-      const checkInISO = response.attendance.checkIn;
-      setCheckInTime(formatTime(checkInISO));
-      setHasCheckedIn(true);
-      setCheckInAddress(address);
-    } catch (err) {
-      console.error('Check-in failed:', err);
-      alert('Failed to get location or check in. Please allow location access.');
+const handleCheckIn = async () => {
+  try {
+    if (!coords) {
+      alert('Location is not available yet. Please wait...');
+      return;
     }
-  };
+
+    const { latitude, longitude } = coords;
+    const address = await fetchAddress(latitude, longitude);
+
+    const location = {
+      lat: latitude,
+      lng: longitude,
+      address,
+    };
+
+    console.log('Sending check-in location:', location);
+
+    const response = await checkIn(location);
+
+    const checkInISO = response.attendance.checkIn;
+    setCheckInTime(formatTime(checkInISO));
+    setHasCheckedIn(true);
+    setCheckInAddress(address);
+  } catch (err) {
+    console.error('Check-in failed:', err);
+    alert('Failed to check in.');
+  }
+};
+
 
   // Handle CheckOut with real location and address
   const handleCheckOut = async () => {
@@ -132,10 +149,12 @@ function HomePage() {
         lng: longitude,
         address,
       };
+      console.log(location);
       const response = await checkOut(location);
       setHasCheckedOut(true);
       setCheckOutAddress(address);
-    } catch (err) {
+    } 
+    catch (err) {
       console.error('Check-out failed:', err);
       alert('Failed to get location or check out. Please allow location access.');
     }
