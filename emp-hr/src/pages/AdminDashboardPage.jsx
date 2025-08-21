@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllUsers, assignReportingManager } from '../components/Api'; // Assuming you create these API functions
+import { getAllUsers, assignReportingManager } from '../components/Api';
 import { toast, ToastContainer } from 'react-toastify';
 
 function AdminDashboardPage() {
@@ -7,6 +7,7 @@ function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedManager, setSelectedManager] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchUsers = async () => {
     try {
@@ -42,88 +43,102 @@ function AdminDashboardPage() {
   };
 
   const teamLeaders = users.filter(user => user.userType === 'teamleader');
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="p-8 bg-gray-900 text-white min-h-screen">
       <ToastContainer theme="colored" />
-      <h1 className="text-4xl font-bold text-emerald-400 mb-8">Admin Dashboard</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Left Side: All Users */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h2 className="text-2xl font-semibold mb-4">All Users</h2>
-          {isLoading ? (
-            <p>Loading users...</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-gray-800 border border-gray-700 rounded-lg">
-                <thead>
-                  <tr className="bg-gray-700">
-                    <th className="p-4 text-left">Name</th>
-                    <th className="p-4 text-left">Email</th>
-                    <th className="p-4 text-left">Reporting Manager</th>
-                    <th className="p-4 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user._id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                      <td className="p-4">{user.name}</td>
-                      <td className="p-4">{user.email}</td>
-                      <td className="p-4">{user.reportingManager ? user.reportingManager.name : 'N/A'}</td>
-                      <td className="p-4">
-                        <button 
-                          onClick={() => setSelectedEmployee(user._id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                        >
-                          Assign Manager
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-emerald-400 mb-8">Admin Dashboard</h1>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Side: All Users */}
+          <div className="lg:col-span-2 bg-gray-800 p-6 rounded-lg border border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold">All Users</h2>
+              <input 
+                type="text" 
+                placeholder="Search users..." 
+                className="p-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          )}
-        </div>
+            {isLoading ? (
+              <p>Loading users...</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-gray-800">
+                  <thead>
+                    <tr className="bg-gray-700">
+                      <th className="p-4 text-left">Name</th>
+                      <th className="p-4 text-left">Email</th>
+                      <th className="p-4 text-left">Reporting Manager</th>
+                      <th className="p-4 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user._id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                        <td className="p-4">{user.name}</td>
+                        <td className="p-4">{user.email}</td>
+                        <td className="p-4">{user.reportingManager ? user.reportingManager.name : 'N/A'}</td>
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={() => setSelectedEmployee(user._id)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                          >
+                            Assign Manager
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
-        {/* Right Side: Assign Manager Form */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h2 className="text-2xl font-semibold mb-4">Assign Reporting Manager</h2>
-          {selectedEmployee ? (
-            <form onSubmit={handleAssignManager} className="space-y-6">
-              <div>
-                <label className="text-sm font-bold text-gray-400 block mb-2">Selected Employee</label>
-                <input 
-                  type="text" 
-                  value={users.find(u => u._id === selectedEmployee)?.name || ''} 
-                  readOnly 
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-gray-400 block mb-2">Select Manager (Team Leader)</label>
-                <select 
-                  value={selectedManager} 
-                  onChange={(e) => setSelectedManager(e.target.value)}
-                  className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          {/* Right Side: Assign Manager Form */}
+          <div className="lg:col-span-1 bg-gray-800 p-6 rounded-lg border border-gray-700">
+            <h2 className="text-2xl font-semibold mb-4">Assign Reporting Manager</h2>
+            {selectedEmployee ? (
+              <form onSubmit={handleAssignManager} className="space-y-6">
+                <div>
+                  <label className="text-sm font-bold text-gray-400 block mb-2">Selected Employee</label>
+                  <input 
+                    type="text" 
+                    value={users.find(u => u._id === selectedEmployee)?.name || ''} 
+                    readOnly 
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-400 block mb-2">Select Manager (Team Leader)</label>
+                  <select 
+                    value={selectedManager} 
+                    onChange={(e) => setSelectedManager(e.target.value)}
+                    className="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Select a manager</option>
+                    {teamLeaders.map(leader => (
+                      <option key={leader._id} value={leader._id}>{leader.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button 
+                  type="submit" 
+                  className="w-full py-3 font-semibold bg-emerald-600 rounded-md hover:bg-emerald-700 transition-transform transform hover:scale-105"
                 >
-                  <option value="">Select a manager</option>
-                  {teamLeaders.map(leader => (
-                    <option key={leader._id} value={leader._id}>{leader.name}</option>
-                  ))}
-                </select>
-              </div>
-              <button 
-                type="submit" 
-                className="w-full py-3 font-semibold bg-emerald-600 rounded-md hover:bg-emerald-700 transition-transform transform hover:scale-105"
-              >
-                Assign Manager
-              </button>
-            </form>
-          ) : (
-            <p>Select an employee from the list to assign a reporting manager.</p>
-          )}
+                  Assign Manager
+                </button>
+              </form>
+            ) : (
+              <p className="text-center text-gray-400 mt-10">Select an employee from the list to assign a reporting manager.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

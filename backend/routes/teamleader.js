@@ -3,22 +3,18 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 
-// Middleware to check if user is a team leader
-const checkTeamLeader = async (req, res, next) => {
-  if (req.user.userType !== 'teamleader') {
-    return res.status(403).json({ message: 'Access denied. Team leader privileges required.' });
+// Middleware to check if user is a team leader or admin
+const checkTeamLeader = (req, res, next) => {
+  if (req.user.userType !== 'teamleader' && req.user.userType !== 'admin') {
+    return res.status(403).json({ message: 'Access denied. Team leader or admin privileges required.' });
   }
   next();
 };
 
-// ROUTE: GET /api/teamleader/team-members
-// DESC: Get all team members under the logged-in team leader
+// GET /api/teamleader/team-members
 router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
   try {
-    const teamMembers = await User.find({ 
-      reportingManager: req.user.id 
-    }).select('-password'); // Exclude password from response
-
+    const teamMembers = await User.find({ reportingManager: req.user.id }).select('-password');
     res.json(teamMembers);
   } catch (error) {
     console.error(error);
@@ -26,34 +22,29 @@ router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// ROUTE: GET /api/teamleader/pending-leaves
-// DESC: Get all pending leave requests from team members
+// GET /api/teamleader/pending-leaves
 router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   try {
-    const teamMembers = await User.find({ 
-      reportingManager: req.user.id 
-    }).populate('leaves');
-
+    const teamMembers = await User.find({ reportingManager: req.user.id });
     const pendingLeaves = [];
-    
     teamMembers.forEach(member => {
       member.leaves.forEach(leave => {
         if (leave.status === 'pending') {
           pendingLeaves.push({
             leaveId: leave._id,
             employeeId: member._id,
-            employeeName: member.name,
-            employeeEmail: member.email,
+            employeeName: `${member.firstName} ${member.lastName}`,
+            employeeEmail: member.workEmail,
             date: leave.date,
             type: leave.type,
             duration: leave.duration,
+            reason: leave.reason,
             appliedOn: leave.appliedOn,
             status: leave.status
           });
         }
       });
     });
-
     res.json(pendingLeaves);
   } catch (error) {
     console.error(error);
@@ -61,8 +52,7 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// ROUTE: PUT /api/teamleader/approve-leave
-// DESC: Approve a leave request
+// PUT /api/teamleader/approve-leave
 router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId } = req.body;
 
@@ -71,10 +61,7 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const employee = await User.findOne({ 
-      _id: employeeId, 
-      reportingManager: req.user.id 
-    });
+    const employee = await User.findOne({ _id: employeeId, reportingManager: req.user.id });
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
@@ -89,18 +76,15 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
       return res.status(400).json({ message: 'Leave request is not pending' });
     }
 
-    // Check if employee has sufficient paid leave balance (for paid leaves only)
     if (leave.type === 'paid') {
       if (employee.paidLeaveBalance < leave.duration) {
         return res.status(400).json({ 
           message: `Cannot approve. Employee has insufficient paid leave balance. Available: ${employee.paidLeaveBalance} days` 
         });
       }
-      // Deduct from balance upon approval
       employee.paidLeaveBalance -= leave.duration;
     }
 
-    // Update leave status
     leave.status = 'approved';
     leave.approvedBy = req.user.id;
     leave.approvedOn = new Date();
@@ -111,7 +95,7 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
       message: 'Leave request approved successfully',
       leave: {
         leaveId: leave._id,
-        employeeName: employee.name,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
         status: leave.status,
         approvedOn: leave.approvedOn
       }
@@ -123,8 +107,7 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// ROUTE: PUT /api/teamleader/reject-leave
-// DESC: Reject a leave request
+// PUT /api/teamleader/reject-leave
 router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId, rejectionReason } = req.body;
 
@@ -133,10 +116,7 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const employee = await User.findOne({ 
-      _id: employeeId, 
-      reportingManager: req.user.id 
-    });
+    const employee = await User.findOne({ _id: employeeId, reportingManager: req.user.id });
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
@@ -151,12 +131,11 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       return res.status(400).json({ message: 'Leave request is not pending' });
     }
 
-    // Update leave status
     leave.status = 'rejected';
     leave.approvedBy = req.user.id;
     leave.approvedOn = new Date();
     if (rejectionReason) {
-      leave.rejectionReason = rejectionReason; // You may want to add this field to schema
+      leave.rejectionReason = rejectionReason;
     }
 
     await employee.save();
@@ -165,7 +144,7 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       message: 'Leave request rejected successfully',
       leave: {
         leaveId: leave._id,
-        employeeName: employee.name,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
         status: leave.status,
         rejectedOn: leave.approvedOn
       }

@@ -3,11 +3,9 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 
-// Middleware to check if user is an admin (you can add this field to User model)
-const checkAdmin = async (req, res, next) => {
-  // For now, let's assume team leaders can assign reporting managers
-  // You can add an 'admin' userType later if needed
-  if (req.user.userType !== 'teamleader') {
+// Middleware to check if user is an admin
+const checkAdmin = (req, res, next) => {
+  if (req.user.userType !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
   }
   next();
@@ -33,8 +31,8 @@ router.put('/assign-reporting-manager', auth, checkAdmin, async (req, res) => {
       if (!manager) {
         return res.status(404).json({ message: 'Manager not found' });
       }
-      if (manager.userType !== 'teamleader') {
-        return res.status(400).json({ message: 'Specified manager must be a team leader' });
+      if (manager.userType !== 'teamleader' && manager.userType !== 'admin') {
+        return res.status(400).json({ message: 'Specified manager must be a team leader or admin' });
       }
       if (employeeId === managerId) {
         return res.status(400).json({ message: 'Employee cannot be their own reporting manager' });
@@ -45,7 +43,7 @@ router.put('/assign-reporting-manager', auth, checkAdmin, async (req, res) => {
     await employee.save();
 
     const updatedEmployee = await User.findById(employeeId)
-      .populate('reportingManager', 'name email userType')
+      .populate('reportingManager', 'firstName lastName workEmail userType')
       .select('-password');
 
     res.json({
@@ -64,9 +62,10 @@ router.put('/assign-reporting-manager', auth, checkAdmin, async (req, res) => {
 router.get('/all-users', auth, checkAdmin, async (req, res) => {
   try {
     const users = await User.find()
-      .populate('reportingManager', 'name email')
+      .populate('reportingManager', 'firstName lastName workEmail')
+      .populate('functionalManager', 'firstName lastName workEmail')
       .select('-password')
-      .sort({ name: 1 });
+      .sort({ firstName: 1 });
 
     res.json(users);
   } catch (error) {

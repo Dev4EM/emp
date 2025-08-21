@@ -13,7 +13,8 @@ import PendingLeavesPage from './pages/PendingLeavesPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import MyAttendancePage from './pages/MyAttendancePage';
 import LeaveBalancePage from './pages/LeaveBalancePage';
-import LeaveDetailsPage from './pages/LeaveDetailsPage';
+import PastLeavesPage from './pages/PastLeavesPage';
+import ProfilePage from './pages/ProfilePage';
 
 
 // Helper component to handle layout logic
@@ -38,7 +39,8 @@ function LayoutRoutes() {
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/my-attendance" element={<MyAttendancePage />} />
               <Route path="/leave-balance" element={<LeaveBalancePage />} />
-              <Route path="/leave-details" element={<LeaveDetailsPage />} />
+              <Route path="/past-leaves" element={<PastLeavesPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
             {/* Add more routes here */}
           </Routes>
