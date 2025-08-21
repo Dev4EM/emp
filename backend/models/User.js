@@ -56,7 +56,8 @@ const UserSchema = new mongoose.Schema({
       status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, // UPDATED
       appliedOn: { type: Date, default: Date.now }, // NEW FIELD
       approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // NEW FIELD
-      approvedOn: { type: Date, default: null } // NEW FIELD
+      approvedOn: { type: Date, default: null }, // NEW FIELD
+      reason: { type: String, default: '' } // NEW FIELD
     }
   ]
 });

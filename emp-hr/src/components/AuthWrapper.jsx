@@ -1,18 +1,11 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 
-const AuthWrapper = ({ children }) => {
-  const navigate = useNavigate();
+const AuthWrapper = () => {
+  const token = localStorage.getItem('token');
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (!token) {
-      navigate('/login'); // 👈 redirect if no token
-    }
-  }, [navigate]);
-
-  return <div className='p-4'>{children}</div>;
+  // If token exists, render the nested routes (children)
+  // Otherwise, redirect to the login page
+  return token ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
 export default AuthWrapper;

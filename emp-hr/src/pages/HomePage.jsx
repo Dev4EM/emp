@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import AttendCalen from '../components/AttendCalen';
-import AuthWrapper from '../components/AuthWrapper';
 import { checkIn, checkOut, getUser } from '../components/Api';
 import { useGeolocated } from 'react-geolocated';
+import { toast, ToastContainer } from 'react-toastify';
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -14,17 +14,17 @@ function HomePage() {
   const [checkOutAddress, setCheckOutAddress] = useState('');
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
-const {
-  coords,
-  isGeolocationAvailable,
-  isGeolocationEnabled,
-} = useGeolocated({
-  positionOptions: {
-    enableHighAccuracy: true,
-  },
-  userDecisionTimeout: 5000,
-});
-  // Get today's attendance
+  const {
+    coords,
+    isGeolocationAvailable,
+    isGeolocationEnabled,
+  } = useGeolocated({
+    positionOptions: {
+      enableHighAccuracy: true,
+    },
+    userDecisionTimeout: 5000,
+  });
+
   const extractTodayAttendance = (attendanceList) => {
     const today = new Date();
     return attendanceList.find((entry) => {
@@ -37,7 +37,6 @@ const {
     });
   };
 
-  // Format time "10:00 AM"
   const formatTime = (isoTime) => {
     return new Date(isoTime).toLocaleTimeString('en-IN', {
       hour: '2-digit',
@@ -46,7 +45,6 @@ const {
     });
   };
 
-  // Reverse geocode lat,lng to address via OpenStreetMap Nominatim
   const fetchAddress = async (lat, lng) => {
     try {
       const response = await fetch(
@@ -60,7 +58,6 @@ const {
     }
   };
 
-  // Fetch user and check today's attendance
   const fetchUser = async () => {
     try {
       const userData = await getUser();
@@ -70,93 +67,58 @@ const {
       if (todayAttendance?.checkIn) {
         setCheckInTime(formatTime(todayAttendance.checkIn));
         setHasCheckedIn(true);
-
-        if (todayAttendance.checkInLocation?.address) {
-          setCheckInAddress(todayAttendance.checkInLocation.address);
-        } else {
-          setCheckInAddress('Address not available');
-        }
+        setCheckInAddress(todayAttendance.checkInLocation?.address || 'Address not available');
       }
       if (todayAttendance?.checkOut) {
         setHasCheckedOut(true);
-
-        if (todayAttendance.checkOutLocation?.address) {
-          setCheckOutAddress(todayAttendance.checkOutLocation.address);
-        } else {
-          setCheckOutAddress('Address not available');
-        }
+        setCheckOutAddress(todayAttendance.checkOutLocation?.address || 'Address not available');
       }
     } catch (err) {
-      console.error('Error fetching user:', err);
+      toast.error(err.response?.data?.message || 'Error fetching user data.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Get browser geolocation (returns a Promise)
-  const getCurrentPosition = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your browser'));
-      } else {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      }
-    });
-  };
-
-  // Handle CheckIn with real location and address
-const handleCheckIn = async () => {
-  try {
-    if (!coords) {
-      alert('Location is not available yet. Please wait...');
+  const handleCheckIn = async () => {
+    if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
+      toast.error('Please enable location services to check in.');
       return;
     }
 
-    const { latitude, longitude } = coords;
-    const address = await fetchAddress(latitude, longitude);
-
-    const location = {
-      lat: latitude,
-      lng: longitude,
-      address,
-    };
-
-    console.log('Sending check-in location:', location);
-
-    const response = await checkIn(location);
-
-    const checkInISO = response.attendance.checkIn;
-    setCheckInTime(formatTime(checkInISO));
-    setHasCheckedIn(true);
-    setCheckInAddress(address);
-  } catch (err) {
-    console.error('Check-in failed:', err);
-    alert('Failed to check in.');
-  }
-};
-
-
-  // Handle CheckOut with real location and address
-  const handleCheckOut = async () => {
     try {
-      const position = await getCurrentPosition();
-      const { latitude, longitude } = position.coords;
-
+      const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
+      const location = { lat: latitude, lng: longitude, address };
 
-      const location = {
-        lat: latitude,
-        lng: longitude,
-        address,
-      };
-      console.log(location);
+      const response = await checkIn(location);
+      const checkInISO = response.attendance.checkIn;
+      setCheckInTime(formatTime(checkInISO));
+      setHasCheckedIn(true);
+      setCheckInAddress(address);
+      toast.success(response.message);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Check-in failed.');
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
+      toast.error('Please enable location services to check out.');
+      return;
+    }
+
+    try {
+      const { latitude, longitude } = coords;
+      const address = await fetchAddress(latitude, longitude);
+      const location = { lat: latitude, lng: longitude, address };
+
       const response = await checkOut(location);
       setHasCheckedOut(true);
       setCheckOutAddress(address);
-    } 
-    catch (err) {
-      console.error('Check-out failed:', err);
-      alert('Failed to get location or check out. Please allow location access.');
+      toast.success(response.message);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Check-out failed.');
     }
   };
 
@@ -167,7 +129,8 @@ const handleCheckIn = async () => {
   if (loading) return <div className="text-white p-6">Loading user data...</div>;
 
   return (
-    <AuthWrapper>
+    <>
+      <ToastContainer theme="colored" />
       <div className="fixed mt-10 left-0 w-full">
         <div className="flex pl-[130px] flex-row items-center justify-between w-full bg-[#051b56bf] p-3 text-white">
           <div className="flex flex-col items-start">
@@ -194,17 +157,14 @@ const handleCheckIn = async () => {
 
             {hasCheckedIn && !hasCheckedOut && (
               <>
-               
                 <button
                   onClick={handleCheckOut}
                   className="bg-[#e96101] w-full m-2 pl-5 pr-5 pt-2 pb-2 rounded-lg"
                 >
                   <LogoutOutlinedIcon /> Check Out
                 </button>
-                 <p className="text-sm text-green-300">
+                <p className="text-sm text-green-300">
                   Checked in at: {checkInTime}
-                  <br />
-                
                 </p>
               </>
             )}
@@ -212,8 +172,6 @@ const handleCheckIn = async () => {
             {hasCheckedOut && (
               <p className="text-sm text-yellow-300">
                 Checked out successfully
-                <br />
-            
               </p>
             )}
           </div>
@@ -221,7 +179,7 @@ const handleCheckIn = async () => {
 
         <AttendCalen />
       </div>
-    </AuthWrapper>
+    </>
   );
 }
 

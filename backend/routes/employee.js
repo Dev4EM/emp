@@ -47,7 +47,7 @@ router.get('/leave-balance', auth, async (req, res) => {
 
 // ROUTE: POST /api/employee/apply-leave (UPDATED)
 router.post('/apply-leave', auth, async (req, res) => {
-  const { leaveDate, leaveType, leaveDuration } = req.body;
+  const { leaveDate, leaveType, leaveDuration, reason } = req.body;
   const duration = leaveDuration === 0.5 ? 0.5 : 1;
 
   if (!leaveDate || !leaveType) {
@@ -75,6 +75,7 @@ router.post('/apply-leave', auth, async (req, res) => {
       date: leaveDate, 
       type: leaveType, 
       duration: duration,
+      reason: reason, // Save the reason
       status: 'pending' // Always pending initially
     });
 

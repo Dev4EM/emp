@@ -40,14 +40,58 @@ export const checkOut = async (locationData) => {
   return response.data; // contains updated attendance and message
 };
 // Example: Get Attendance
-export const getAttendance = (userId) => API.get(`/attendance/${userId}`);
+export const getMyAttendance = async () => {
+    const response = await API.get('/employee/my-attendance');
+    return response.data;
+};
 
 // Example: Mark Attendance
 export const markAttendance = (data) => API.post('/attendance', data);
 
 // Example: Apply for Leave
-export const applyLeave = (leaveData) => API.post('/leave/apply', leaveData);
+export const applyLeave = (leaveData) => API.post('/employee/apply-leave', leaveData);
+
+export const getLeaveBalance = async () => {
+    const response = await API.get('/employee/leave-balance');
+    return response.data;
+};
+
+// Team Leader APIs
+export const getTeamMembers = async () => {
+  const response = await API.get('/teamleader/team-members');
+  return response.data;
+};
+
+export const getPendingLeaves = async () => {
+  const response = await API.get('/teamleader/pending-leaves');
+  return response.data;
+};
+
+export const approveLeave = async (data) => {
+  const response = await API.put('/teamleader/approve-leave', data);
+  return response.data;
+};
+
+export const rejectLeave = async (data) => {
+  const response = await API.put('/teamleader/reject-leave', data);
+  return response.data;
+};
+
+// Admin APIs
+export const getAllUsers = async () => {
+  const response = await API.get('/admin/all-users');
+  return response.data;
+};
+
+export const assignReportingManager = async (data) => {
+  const response = await API.put('/admin/assign-reporting-manager', data);
+  return response.data;
+};
+
 
 // Add more APIs as needed...
 
 export default API;
+
+
+ API;
