@@ -204,6 +204,58 @@ router.delete('/delete-user/:id', auth, checkAdmin, async (req, res) => {
     });
   }
 });
+// GET /api/admin/all-leaves
+// DESC: Get all leaves (pending, approved, rejected) across the organization
+router.get('/all-leaves', auth, checkAdmin, async (req, res) => {
+  try {
+    // Get all users with leaves
+    const users = await User.find({
+      'leaves.0': { $exists: true } // Only users who have at least one leave
+    }) 
+    const allLeaves = [];
+    
+    users.forEach(user => {
+      console.log(user);
+      user.leaves.forEach(leave => {
+        allLeaves.push({
+          leaveId: leave._id,
+          employeeId: user._id,
+          employeeName: String(user["First name"]),
+          employeeEmail: user["Work email"],
+          employeeCode: user["Employee Code"],
+          department: user.Department,
+          designation: user.Designation,
+          date: leave.date,
+          type: leave.type,
+          duration: leave.duration,
+          reason: leave.reason,
+          appliedOn: leave.appliedOn,
+          status: leave.status,
+          approvedBy: leave.approvedBy,
+          approvedOn: leave.approvedOn,
+          rejectionReason: leave.rejectionReason
+        });
+      });
+    });
+
+    // Sort by applied date (newest first)
+    allLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
+
+    res.json({
+      success: true,
+      count: allLeaves.length,
+      leaves: allLeaves
+    });
+
+  } catch (error) {
+    console.error('Error fetching all leaves:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server Error',
+      error: error.message 
+    });
+  }
+});
 
 // ROUTE: GET /api/admin/dashboard-stats
 // DESC: Get dashboard statistics for admin
