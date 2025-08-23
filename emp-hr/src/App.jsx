@@ -15,7 +15,10 @@ import MyAttendancePage from './pages/MyAttendancePage';
 import LeaveBalancePage from './pages/LeaveBalancePage';
 import PastLeavesPage from './pages/PastLeavesPage';
 import ProfilePage from './pages/ProfilePage';
-
+import AddEmployeePage from './pages/AddEmployeePage';
+import ManageEmployeesPage from './pages/ManageEmployeesPage.jsx';
+import TeamAttendancePage from './pages/TeamAttendancePage';
+import ManageAppPage from './pages/ManageAppPage';
 
 // Helper component to handle layout logic
 function LayoutRoutes() {
@@ -28,7 +31,7 @@ function LayoutRoutes() {
       {!hideLayout && <Navbar />}
       <div className="flex flex-1">
         {!hideLayout && <Sidebar />}
-        <main className="flex-1  overflow-auto mt-16">
+        <main className={`flex-1 overflow-auto ${hideLayout ? '' : 'ml-24 mt-16'}`}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<AuthWrapper />}>
@@ -41,14 +44,16 @@ function LayoutRoutes() {
               <Route path="/leave-balance" element={<LeaveBalancePage />} />
               <Route path="/past-leaves" element={<PastLeavesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/add-employee" element={<AddEmployeePage />} />
+              <Route path="/manage-employees" element={<ManageEmployeesPage />} />
+              <Route path="/team-attendance" element={<TeamAttendancePage />} />
+              <Route path="/manage-app" element={<ManageAppPage />} />
             </Route>
-            {/* Add more routes here */}
           </Routes>
         </main>
       </div>
     </Wrapper>
     </>
-
   );
 }
 

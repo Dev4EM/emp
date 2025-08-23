@@ -11,10 +11,40 @@ const checkTeamLeader = (req, res, next) => {
   next();
 };
 
-// GET /api/teamleader/team-members
+// POST /api/teamleader/add-employee
+router.post('/add-employee', auth, checkTeamLeader, async (req, res) => {
+    const { "Work email": workEmail } = req.body;
+    try {
+        let user = await User.findOne({ "Work email": workEmail });
+        if (user) {
+            return res.status(400).json({ message: 'User with this email already exists' });
+        }
+
+        const newEmployee = new User(req.body);
+        await newEmployee.save();
+
+        res.status(201).json({ message: 'Employee added successfully', user: newEmployee });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
+// GET /api/teamleader/team-members - Updated to find by reporting manager name
 router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
   try {
-    const teamMembers = await User.find({ reportingManager: req.user.id }).select('-password');
+    // Get the current user's full name to match against reporting manager field
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    // Find all users whose "Reporting manager" field matches the current user's name (case-insensitive)
+    const teamMembers = await User.find({ 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    }).select('-password');
+    
     res.json(teamMembers);
   } catch (error) {
     console.error(error);
@@ -22,10 +52,20 @@ router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// GET /api/teamleader/pending-leaves
+// GET /api/teamleader/pending-leaves - Updated to work with reporting manager names
 router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   try {
-    const teamMembers = await User.find({ reportingManager: req.user.id });
+    // Get the current user's full name
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    // Find team members by reporting manager name
+    const teamMembers = await User.find({ 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    });
+    
     const pendingLeaves = [];
     teamMembers.forEach(member => {
       member.leaves.forEach(leave => {
@@ -33,8 +73,9 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
           pendingLeaves.push({
             leaveId: leave._id,
             employeeId: member._id,
-            employeeName: `${member.firstName} ${member.lastName}`,
-            employeeEmail: member.workEmail,
+            employeeName: `${member["First name"]} ${member["Last name"]}`,
+            employeeEmail: member["Work email"],
+            employeeCode: member["Employee Code"],
             date: leave.date,
             type: leave.type,
             duration: leave.duration,
@@ -45,6 +86,10 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
         }
       });
     });
+    
+    // Sort by applied date (newest first)
+    pendingLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
+    
     res.json(pendingLeaves);
   } catch (error) {
     console.error(error);
@@ -52,7 +97,7 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// PUT /api/teamleader/approve-leave
+// PUT /api/teamleader/approve-leave - Updated to work with reporting manager names
 router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId } = req.body;
 
@@ -61,7 +106,17 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const employee = await User.findOne({ _id: employeeId, reportingManager: req.user.id });
+    // Get the current user's full name
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    // Find employee by ID and verify they report to current user
+    const employee = await User.findOne({ 
+      _id: employeeId, 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    });
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
@@ -95,9 +150,13 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
       message: 'Leave request approved successfully',
       leave: {
         leaveId: leave._id,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
+        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
+        employeeCode: employee["Employee Code"],
         status: leave.status,
-        approvedOn: leave.approvedOn
+        approvedOn: leave.approvedOn,
+        type: leave.type,
+        duration: leave.duration,
+        date: leave.date
       }
     });
 
@@ -107,7 +166,7 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// PUT /api/teamleader/reject-leave
+// PUT /api/teamleader/reject-leave - Updated to work with reporting manager names
 router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId, rejectionReason } = req.body;
 
@@ -116,7 +175,17 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const employee = await User.findOne({ _id: employeeId, reportingManager: req.user.id });
+    // Get the current user's full name
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    // Find employee by ID and verify they report to current user
+    const employee = await User.findOne({ 
+      _id: employeeId, 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    });
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
@@ -144,12 +213,36 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       message: 'Leave request rejected successfully',
       leave: {
         leaveId: leave._id,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
+        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
+        employeeCode: employee["Employee Code"],
         status: leave.status,
-        rejectedOn: leave.approvedOn
+        rejectedOn: leave.approvedOn,
+        rejectionReason: rejectionReason,
+        type: leave.type,
+        duration: leave.duration,
+        date: leave.date
       }
     });
 
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// GET /api/teamleader/team-attendance - New endpoint to get team attendance
+router.get('/team-attendance', auth, checkTeamLeader, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    const teamMembers = await User.find({ 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    }).select('["First name"] ["Last name"] ["Employee Code"] attendance');
+    
+    res.json(teamMembers);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });

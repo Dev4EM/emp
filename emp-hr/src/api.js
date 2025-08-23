@@ -14,6 +14,7 @@ const request = async (endpoint, options) => {
   return data;
 };
 
+
 const api = {
   loginUser: async (credentials) => {
     return request('/auth/login', {

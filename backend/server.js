@@ -7,9 +7,9 @@ const employeeRoutes = require('./routes/employee'); // 1. Import the new routes
 const teamLeaderRoutes = require('./routes/teamleader'); // NEW IMPORT
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin'); // Add this import
-
+ 
 const app = express();
-const PORT = process.env.PORT || 5018;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
@@ -25,8 +25,9 @@ app.get('/', (req, res) => {
   res.send('🚀 EMP Backend is running successfully!');
 });
 
+
 // API Routes
-app.use('/api/auth', authRoutes);
+ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/employee', employeeRoutes); // 2. Use the new routes with a prefix
 app.use('/api/teamleader', teamLeaderRoutes); // NEW ROUTE

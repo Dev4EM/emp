@@ -1,60 +1,52 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-    // Personal Details
-    prefix: { type: String, trim: true },
-    firstName: { type: String, required: true, trim: true },
-    middleName: { type: String, trim: true },
-    lastName: { type: String, required: true, trim: true },
-    dateOfBirth: { type: Date },
-    gender: { type: String, enum: ['Male', 'Female', 'Other'] },
-    bloodGroup: { type: String },
-    nationality: { type: String },
+    // Personal Details - Updated to match your data format
+    "Prefix": { type: String, trim: true },
+    "First name": { type: String, required: true, trim: true },
+    "Last name": { type: String, required: true, trim: true },
+    "Date of birth": { type: String }, // Keeping as string to match your format "02/06/2001"
+    "Gender": { type: String, enum: ['Male', 'Female', 'Other'] },
+    "Blood group": { type: String },
+    "Nationality": { type: String },
 
     // Contact Details
-    workEmail: { type: String, required: true, unique: true, trim: true },
-    mobileNumber: { type: String },
+    "Work email": { type: String, required: true, unique: true, trim: true },
+    "Mobile number": { type: String },
+    "ISDcode": { type: Number, default: 91 },
 
     // Authentication
     password: { type: String, required: true },
 
-    // Employment Details
-    employeeCode: { type: String, unique: true, sparse: true },
-    biometricId: { type: String, unique: true, sparse: true },
-    dateOfJoining: { type: Date },
-    employmentType: { type: String },
-    employmentStatus: { type: String, default: 'Active' },
-    company: { type: String },
-    businessUnit: { type: String },
-    department: { type: String },
-    subDepartment: { type: String },
-    designation: { type: String },
-    region: { type: String },
-    branch: { type: String },
-    subBranch: { type: String },
-    shift: { type: String },
-    level: { type: String },
-    skillType: { type: String },
-    dateOfConfirmation: { type: Date },
+    // Employment Details - Updated to match your data format
+    "Employee Code": { type: String, unique: true, sparse: true },
+    "Date of joining": { type: String }, // Keeping as string to match your format "22/07/2024"
+    "Employment type": { type: String },
+    "Employment status": { type: String, default: 'Active' },
+    "Company": { type: String },
+    "Business Unit": { type: String },
+    "Department": { type: String },
+    "Sub department": { type: String },
+    "Designation": { type: String },
+    "Region": { type: String },
+    "Branch": { type: String },
+    "Sub branch": { type: String },
+    "Shift": { type: String },
+    "Level": { type: String },
+    "Skill Type": { type: String },
+    "Date of Confirmation": { type: String }, // Keeping as string to match format
+    "Employee Other Status": { type: String },
 
-    // Hierarchy and Roles
+    // Hierarchy and Roles - Updated field names
     userType: {
         type: String,
         enum: ['employee', 'teamleader', 'admin'],
         default: 'employee'
     },
-    reportingManager: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null
-    },
-    functionalManager: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null
-    },
+    "Reporting manager": { type: String }, // Changed to String to match your data
+    "Functional manager": { type: String }, // Changed to String to match your data
 
-    // Leave and Attendance
+    // Leave and Attendance (keeping existing structure for compatibility)
     paidLeaveBalance: { type: Number, default: 12 },
     attendance: [
         {
@@ -78,7 +70,7 @@ const UserSchema = new mongoose.Schema({
         }
     ],
 
-    // Separation Details
+    // Separation Details (keeping for future use)
     dateOfLeaving: { type: Date },
     dateOfResignation: { type: Date },
     dateOfSettlement: { type: Date },
@@ -90,16 +82,10 @@ const UserSchema = new mongoose.Schema({
     blacklistReason: { type: String },
     blacklistComments: { type: String },
 
-    // Other Status
-    otherStatus: { type: String },
-    otherStatusDate: { type: Date },
-    otherStatusRemarks: { type: String },
-    isdCode: { type: String },
-
 }, { timestamps: true });
 
 UserSchema.methods.comparePassword = async function(enteredPassword) {
-  return enteredPassword === this.password;
+    return enteredPassword === this.password;
 };
 
 module.exports = mongoose.model('User', UserSchema);
