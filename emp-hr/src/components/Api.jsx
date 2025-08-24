@@ -109,6 +109,11 @@ export const approveLeave = async (employeeId, leaveId) => {
     throw error;
   }
 };
+// Get all leaves (admin only)
+export const getAllLeaves = async () => {
+  const response = await API.get('/admin/all-leaves');
+  return response.data;
+};
 
 export const rejectLeave = async (employeeId, leaveId, rejectionReason) => {
   try {
@@ -132,6 +137,16 @@ export const getAllUsers = async () => {
 };
 export const assignReportingManager = async (data) => {
   const response = await API.put('/admin/assign-reporting-manager', data);
+  return response.data;
+};
+
+export const getUserAttendance = async (userId) => {
+  const response = await API.get(`/user/${userId}/attendance`);
+  return response.data;
+};
+
+export const getUserLeaveBalance = async (userId) => {
+  const response = await API.get(`/user/${userId}/leave-balance`);
   return response.data;
 };
 

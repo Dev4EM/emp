@@ -6,7 +6,7 @@ import 'react-day-picker/dist/style.css';
 // Example:
 import { getUser } from './Api';
 
-export default function AttendCalen() {
+export default function AttendCalen({ attendanceData }) {
   const [attendanceMap, setAttendanceMap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,34 +23,49 @@ export default function AttendCalen() {
 
 
   useEffect(() => {
-    async function loadUserData() {
-      setLoading(true);
-      setError(null);
-      try {
-        const userData = await getUser(); // <-- your real API call here
-        // userData should include an attendance array
-
-        const map = {};
-        if (userData.attendance && Array.isArray(userData.attendance)) {
-          userData.attendance.forEach((record) => {
-            const dayKey = normalizeDate(record.date);
-            map[dayKey] = {
-              checkIn: record.checkIn,
-              checkOut: record.checkOut,
-            };
-          });
-        }
-        setAttendanceMap(map);
-      } catch (err) {
-        setError('Failed to load attendance data.');
-        console.error(err);
-      } finally {
-        setLoading(false);
+    if (attendanceData) {
+      const map = {};
+      if (Array.isArray(attendanceData)) {
+        attendanceData.forEach((record) => {
+          const dayKey = normalizeDate(record.date);
+          map[dayKey] = {
+            checkIn: record.checkIn,
+            checkOut: record.checkOut,
+          };
+        });
       }
-    }
+      setAttendanceMap(map);
+      setLoading(false);
+    } else {
+      async function loadUserData() {
+        setLoading(true);
+        setError(null);
+        try {
+          const userData = await getUser(); // <-- your real API call here
+          // userData should include an attendance array
 
-    loadUserData();
-  }, []);
+          const map = {};
+          if (userData.attendance && Array.isArray(userData.attendance)) {
+            userData.attendance.forEach((record) => {
+              const dayKey = normalizeDate(record.date);
+              map[dayKey] = {
+                checkIn: record.checkIn,
+                checkOut: record.checkOut,
+              };
+            });
+          }
+          setAttendanceMap(map);
+        } catch (err) {
+          setError('Failed to load attendance data.');
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      loadUserData();
+    }
+  }, [attendanceData]);
 
   function isComplete(day) {
     if (!attendanceMap) return false;

@@ -72,11 +72,11 @@ const Sidebar = () => {
             <p className='text-[#051b56] text-xs text-center'>Profile</p>
           </Link>
 
-          {/* Team Leader Section */}
-          {(user?.userType === 'teamleader'  ) && (
+          {/* Team Leader Section - Only for Team Leaders (not admins) */}
+          {user?.userType === 'teamleader' && (
             <>
               <div className="border-t border-gray-300 my-4"></div>
-              <div className="text-xs text-gray-500 font-semibold text-center mb-2">TEAM </div>
+              <div className="text-xs text-gray-500 font-semibold text-center mb-2">TEAM MANAGEMENT</div>
               
               <Link to="/team-members" className="flex flex-col items-center hover:bg-blue-100 p-2 rounded-lg transition-colors">
                 <SupervisedUserCircleOutlinedIcon className='text-[#051b56]'/>
@@ -95,7 +95,7 @@ const Sidebar = () => {
             </>
           )}
 
-          {/* Admin Only Section */}
+          {/* Admin Section - Enhanced with All Pending Leaves Access */}
           {user?.userType === 'admin' && (
             <>
               <div className="border-t border-gray-300 my-4"></div>
@@ -115,6 +115,13 @@ const Sidebar = () => {
                 <PersonAddAltOutlinedIcon className='text-[#051b56]'/>
                 <p className='text-[#051b56] text-xs text-center'>Add User</p>
               </Link>
+              
+              {/* Admin can see ALL pending leaves */}
+ <Link to="/all-leaves" className="flex flex-col items-center hover:bg-red-100 p-2 rounded-lg transition-colors">
+  <AssignmentLateOutlinedIcon className='text-[#051b56]'/>
+  <p className='text-[#051b56] text-xs text-center'>All Leaves</p>
+</Link>
+
               
               <Link to="/manage-app" className="flex flex-col items-center hover:bg-purple-100 p-2 rounded-lg transition-colors">
                 <SettingsOutlinedIcon className='text-[#051b56]'/>
