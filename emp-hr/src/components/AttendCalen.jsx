@@ -1,119 +1,130 @@
 import React, { useState, useEffect } from 'react';
 import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
-
-// Make sure your real fetchUser API function is imported or available here
-// Example:
 import { getUser } from './Api';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 export default function AttendCalen({ attendanceData }) {
   const [attendanceMap, setAttendanceMap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Helper to normalize date to yyyy-mm-dd string (UTC midnight)
-  function normalizeDate(date) {
-  const d = new Date(date);
-  // Get local year, month, day to avoid timezone shift
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
+  const normalizeDate = (date) => {
+    const d = new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
 
   useEffect(() => {
-    if (attendanceData) {
-      const map = {};
-      if (Array.isArray(attendanceData)) {
-        attendanceData.forEach((record) => {
-          const dayKey = normalizeDate(record.date);
-          map[dayKey] = {
+    const processData = (data) => {
+      const map = new Map();
+      if (Array.isArray(data)) {
+        data.forEach((record) => {
+          const day = normalizeDate(record.date);
+          map.set(day.getTime(), {
             checkIn: record.checkIn,
             checkOut: record.checkOut,
-          };
+          });
         });
       }
       setAttendanceMap(map);
       setLoading(false);
+    };
+
+    if (attendanceData) {
+      processData(attendanceData);
     } else {
-      async function loadUserData() {
+      const loadUserData = async () => {
         setLoading(true);
         setError(null);
         try {
-          const userData = await getUser(); // <-- your real API call here
-          // userData should include an attendance array
-
-          const map = {};
-          if (userData.attendance && Array.isArray(userData.attendance)) {
-            userData.attendance.forEach((record) => {
-              const dayKey = normalizeDate(record.date);
-              map[dayKey] = {
-                checkIn: record.checkIn,
-                checkOut: record.checkOut,
-              };
-            });
-          }
-          setAttendanceMap(map);
+          const userData = await getUser();
+          processData(userData.attendance);
         } catch (err) {
           setError('Failed to load attendance data.');
           console.error(err);
-        } finally {
           setLoading(false);
         }
-      }
-
+      };
       loadUserData();
     }
   }, [attendanceData]);
 
-  function isComplete(day) {
+  const isPresent = (day) => {
     if (!attendanceMap) return false;
-    const key = normalizeDate(day);
-    const record = attendanceMap[key];
-    return record && record.checkIn && record.checkOut;
-  }
+    const record = attendanceMap.get(normalizeDate(day).getTime());
+    return !!(record?.checkIn && record?.checkOut);
+  };
 
-  function isIncomplete(day) {
+  const isPartial = (day) => {
     if (!attendanceMap) return false;
-    const key = normalizeDate(day);
-    const record = attendanceMap[key];
-    return record && record.checkIn && !record.checkOut;
-  }
+    const record = attendanceMap.get(normalizeDate(day).getTime());
+    return !!(record?.checkIn && !record?.checkOut);
+  };
 
-  function isNone(day) {
+  const isAbsent = (day) => {
     if (!attendanceMap) return false;
-    const key = normalizeDate(day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (day > today) return false; // no color for future dates
-    return !attendanceMap[key];
-  }
+    const today = normalizeDate(new Date());
+    const currentDay = normalizeDate(day);
+    if (currentDay >= today) return false;
+    return !attendanceMap.has(currentDay.getTime());
+  };
 
-  if (loading) return <div className="text-center p-4">Loading attendance data...</div>;
+  if (loading) return <div className="text-center p-4 text-slate-500">Loading attendance...</div>;
   if (error) return <div className="text-center text-red-600 p-4">{error}</div>;
 
+  const modifiers = {
+    present: isPresent,
+    partial: isPartial,
+    absent: isAbsent,
+  };
+
+  const modifierClassNames = {
+    present: 'bg-blue-600 text-white rounded-full',
+    partial: 'bg-blue-200 text-blue-800 rounded-full',
+    absent: 'text-red-500',
+    today: 'border-2 border-blue-500 rounded-full',
+  };
+
+  const classNames = {
+    root: 'w-full',
+    caption: 'flex items-center justify-between py-2 px-1',
+    caption_label: 'text-base md:text-lg font-bold text-slate-800',
+    nav: 'flex items-center',
+    nav_button: 'h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors',
+    table: 'w-full border-collapse',
+    head_row: 'flex',
+    head_cell: 'w-full text-xs md:text-sm font-semibold text-slate-500 p-1 md:p-2 text-center',
+    row: 'flex w-full mt-1 md:mt-2',
+    cell: 'w-full text-center',
+    day: 'h-9 w-9 md:h-10 md:w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors',
+    day_selected: 'bg-blue-600 text-white',
+    day_today: 'font-bold',
+    day_outside: 'text-slate-400 opacity-50',
+    ...modifierClassNames,
+  };
+
+  const LegendItem = ({ colorClass, label }) => (
+    <div className="flex items-center">
+      <span className={`w-4 h-4 rounded-full mr-2 ${colorClass}`}></span>
+      <span className="text-sm text-slate-600">{label}</span>
+    </div>
+  );
+
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h2 className="text-xl font-semibold mb-4 text-center">Attendance Calendar</h2>
+    <div className="w-full">
       <DayPicker
-        className="max-w-md mx-auto p-2 pl-8 border-2 border-[#051b56bf] rounded-lg shadow-md bg-white"
         mode="single"
-        modifiers={{
-          complete: isComplete,
-          incomplete: isIncomplete,
-          none: isNone,
-        }}
-        modifiersStyles={{
-          complete: { backgroundColor: '#86efac', borderRadius: '50%' }, // green
-          incomplete: { backgroundColor: '#fde68a', borderRadius: '50%' }, // yellow
-          none: { backgroundColor: '#fca5a5', borderRadius: '50%' }, // red
+        modifiers={modifiers}
+        classNames={classNames}
+        components={{
+          IconLeft: () => <ChevronLeftIcon className="w-5 h-5" />,
+          IconRight: () => <ChevronRightIcon className="w-5 h-5" />,
         }}
       />
-      <div className="mt-4 text-center text-sm space-x-4">
-        <span className="inline-block w-4 h-4 bg-green-300 rounded-full"></span> Present
-        <span className="inline-block w-4 h-4 bg-yellow-300 rounded-full ml-4"></span> Check In
-        <span className="inline-block w-4 h-4 bg-red-300 rounded-full ml-4"></span> Absent
+      <div className="mt-4 flex flex-wrap justify-center gap-4">
+        <LegendItem colorClass="bg-blue-600" label="Present" />
+        <LegendItem colorClass="bg-blue-200" label="Partial" />
+        <LegendItem colorClass="border border-red-500" label="Absent" />
       </div>
     </div>
   );

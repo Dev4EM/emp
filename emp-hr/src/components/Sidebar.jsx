@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
@@ -13,134 +13,166 @@ import PeopleOutlineOutlinedIcon from '@mui/icons-material/PeopleOutlineOutlined
 import CalendarViewMonthOutlinedIcon from '@mui/icons-material/CalendarViewMonthOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import useLogout from '../pages/Logout';
 import Modal from './Modal';
 import useUser from '../hooks/useUser';
 
-const Sidebar = () => {
+const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
   const logout = useLogout();
-  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleLogoutClick = () => {
-    setIsModalOpen(true);
-  };
+  // lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isSidebarOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+      return () => (document.body.style.overflow = 'unset');
+    }
+  }, [isSidebarOpen]);
 
+  const handleLogoutClick = () => setIsModalOpen(true);
   const handleConfirmLogout = () => {
     logout();
     setIsModalOpen(false);
   };
+  const handleLinkClick = () => {
+    if (onCloseSidebar && window.innerWidth < 768) onCloseSidebar();
+  };
+  const isActive = (path) => location.pathname === path;
+
+  const Item = ({ to, icon: Icon, text, hover = 'hover:bg-gray-200' }) => (
+    <Link
+      to={to}
+      onClick={handleLinkClick}
+      className={`
+        group relative flex flex-col items-center p-3 rounded-lg transition-colors
+        ${hover}
+        ${isActive(to) ? 'bg-blue-100 text-[#051b56]' : 'text-gray-700'}
+      `}
+      aria-current={isActive(to) ? 'page' : undefined}
+    >
+      <Icon className={`w-6 h-6 ${isActive(to) ? 'text-[#051b56]' : 'text-[#051b56]'}`} />
+      <span
+        className={`
+          text-xs mt-1 text-center leading-tight
+          block md:hidden lg:block
+          ${isActive(to) ? 'text-[#051b56] font-medium' : 'text-[#051b56]'}
+        `}
+      >
+        {text}
+      </span>
+
+      {/* Tooltip for compact (md) */}
+      <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs text-white bg-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition hidden md:block lg:hidden whitespace-nowrap z-50">
+        {text}
+      </span>
+    </Link>
+  );
 
   return (
     <>
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onConfirm={handleConfirmLogout} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmLogout}
         title="Confirm Logout"
       >
         Are you sure you want to logout?
       </Modal>
-      
-      <div className="fixed top-0 left-0 h-full w-24 bg-gray-100 flex flex-col py-4 space-y-6 z-40 overflow-y-auto">
-        <nav className="flex flex-col space-y-4 px-4 mt-20">
-          
-          {/* Common Employee Navigation */}
-          <Link to="/" className="flex flex-col items-center hover:bg-gray-200 p-2 rounded-lg transition-colors">
-            <HomeOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Home</p>
-          </Link>
-          
-          <Link to="/applyLeave" className="flex flex-col items-center hover:bg-gray-200 p-2 rounded-lg transition-colors">
-            <EditCalendarOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Apply Leave</p>
-          </Link>
-          
-          <Link to="/my-attendance" className="flex flex-col items-center hover:bg-gray-200 p-2 rounded-lg transition-colors">
-            <CalendarViewMonthOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Attendance</p>
-          </Link>
-          
-          <Link to="/past-leaves" className="flex flex-col items-center hover:bg-gray-200 p-2 rounded-lg transition-colors">
-            <HistoryOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Past Leaves</p>
-          </Link>
-          
-          <Link to="/profile" className="flex flex-col items-center hover:bg-gray-200 p-2 rounded-lg transition-colors">
-            <AccountCircleOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Profile</p>
-          </Link>
 
-          {/* Team Leader Section - Only for Team Leaders (not admins) */}
-          {user?.userType === 'teamleader' && (
-            <>
-              <div className="border-t border-gray-300 my-4"></div>
-              <div className="text-xs text-gray-500 font-semibold text-center mb-2">TEAM MANAGEMENT</div>
-              
-              <Link to="/team-members" className="flex flex-col items-center hover:bg-blue-100 p-2 rounded-lg transition-colors">
-                <SupervisedUserCircleOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>My Team</p>
-              </Link>
-              
-              <Link to="/pending-leaves" className="flex flex-col items-center hover:bg-orange-100 p-2 rounded-lg transition-colors">
-                <AssignmentLateOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>Pending Leaves</p>
-              </Link>
-              
-              <Link to="/team-attendance" className="flex flex-col items-center hover:bg-green-100 p-2 rounded-lg transition-colors">
-                <BarChartOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>Team Attendance</p>
-              </Link>
-            </>
-          )}
+      {/* Backdrop for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onCloseSidebar}
+          aria-hidden="true"
+        />
+      )}
 
-          {/* Admin Section - Enhanced with All Pending Leaves Access */}
-          {user?.userType === 'admin' && (
-            <>
-              <div className="border-t border-gray-300 my-4"></div>
-              <div className="text-xs text-gray-500 font-semibold text-center mb-2">ADMIN PANEL</div>
-              
-              <Link to="/admin" className="flex flex-col items-center hover:bg-purple-100 p-2 rounded-lg transition-colors">
-                <AdminPanelSettingsOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>Dashboard</p>
-              </Link>
-              
-              <Link to="/manage-employees" className="flex flex-col items-center hover:bg-purple-100 p-2 rounded-lg transition-colors">
-                <PeopleOutlineOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>All Users</p>
-              </Link>
-              
-              <Link to="/add-employee" className="flex flex-col items-center hover:bg-purple-100 p-2 rounded-lg transition-colors">
-                <PersonAddAltOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>Add User</p>
-              </Link>
-              
-              {/* Admin can see ALL pending leaves */}
- <Link to="/all-leaves" className="flex flex-col items-center hover:bg-red-100 p-2 rounded-lg transition-colors">
-  <AssignmentLateOutlinedIcon className='text-[#051b56]'/>
-  <p className='text-[#051b56] text-xs text-center'>All Leaves</p>
-</Link>
-
-              
-              <Link to="/manage-app" className="flex flex-col items-center hover:bg-purple-100 p-2 rounded-lg transition-colors">
-                <SettingsOutlinedIcon className='text-[#051b56]'/>
-                <p className='text-[#051b56] text-xs text-center'>Manage App</p>
-              </Link>
-            </>
-          )}
-
-          {/* Logout Button */}
-          <div className="border-t border-gray-300 my-4"></div>
-          <button 
-            onClick={handleLogoutClick} 
-            className="flex flex-col items-center hover:bg-red-100 p-2 rounded-lg transition-colors"
+      <aside
+        className={`
+          fixed md:sticky top-0 left-0 h-full bg-gray-100 border-r border-gray-200
+          z-50 md:z-30 overflow-y-auto
+          transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
+          w-64 md:w-20 lg:w-36
+        `}
+        role="navigation"
+        aria-label="Sidebar"
+      >
+        {/* Header + Close for mobile */}
+        <div className="flex items-center justify-between p-4 md:justify-center">
+          <h2 className="text-sm font-bold text-[#051b56] md:hidden lg:block">EMP System</h2>
+          <button
+            onClick={onCloseSidebar}
+            className="p-2 rounded hover:bg-gray-200 md:hidden"
+            aria-label="Close sidebar"
           >
-            <LogoutOutlinedIcon className='text-[#051b56]'/>
-            <p className='text-[#051b56] text-xs text-center'>Logout</p>
+            <CloseIcon className="w-5 h-5 text-gray-600" />
           </button>
+        </div>
+
+        <nav className="px-3 pb-6 space-y-2">
+          {/* Common */}
+          <div className="space-y-1 mt-2">
+            <Item to="/" icon={HomeOutlinedIcon} text="Home" />
+            <Item to="/applyLeave" icon={EditCalendarOutlinedIcon} text="Apply Leave" />
+            <Item to="/my-attendance" icon={CalendarViewMonthOutlinedIcon} text="Attendance" />
+            <Item to="/past-leaves" icon={HistoryOutlinedIcon} text="Past Leaves" />
+            <Item to="/profile" icon={AccountCircleOutlinedIcon} text="Profile" />
+          </div>
+
+          {/* Team leader */}
+          {user?.userType === 'teamleader' && (
+            <div className="pt-3 border-t border-gray-200">
+              <h3 className="text-[10px] tracking-wide text-gray-500 font-semibold mb-2 px-2 md:hidden lg:block">
+                TEAM MANAGEMENT
+              </h3>
+              <div className="space-y-1">
+                <Item to="/team-members" icon={SupervisedUserCircleOutlinedIcon} text="My Team" hover="hover:bg-blue-100" />
+                <Item to="/pending-leaves" icon={AssignmentLateOutlinedIcon} text="Pending Leaves" hover="hover:bg-orange-100" />
+                <Item to="/team-attendance" icon={BarChartOutlinedIcon} text="Team Attendance" hover="hover:bg-green-100" />
+              </div>
+            </div>
+          )}
+
+          {/* Admin */}
+          {user?.userType === 'admin' && (
+            <div className="pt-3 border-t border-gray-200">
+              <h3 className="text-[10px] tracking-wide text-gray-500 font-semibold mb-2 px-2 md:hidden lg:block">
+                ADMIN PANEL
+              </h3>
+              <div className="space-y-1">
+                <Item to="/admin" icon={AdminPanelSettingsOutlinedIcon} text="Dashboard" hover="hover:bg-purple-100" />
+                <Item to="/manage-employees" icon={PeopleOutlineOutlinedIcon} text="All Users" hover="hover:bg-purple-100" />
+                <Item to="/add-employee" icon={PersonAddAltOutlinedIcon} text="Add User" hover="hover:bg-purple-100" />
+                <Item to="/all-leaves" icon={AssignmentLateOutlinedIcon} text="All Leaves" hover="hover:bg-red-100" />
+                <Item to="/manage-app" icon={SettingsOutlinedIcon} text="Manage App" hover="hover:bg-purple-100" />
+              </div>
+            </div>
+          )}
+
+          {/* Logout */}
+          <div className="pt-3 border-t border-gray-200">
+            <button
+              onClick={handleLogoutClick}
+              className="group relative w-full flex flex-col items-center p-3 rounded-lg hover:bg-red-100 transition-colors text-[#051b56]"
+            >
+              <LogoutOutlinedIcon className="w-6 h-6" />
+              <span className="text-xs mt-1 text-center leading-tight block md:hidden lg:block">
+                Logout
+              </span>
+              {/* Tooltip for md */}
+              <span className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded text-xs text-white bg-gray-800 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition hidden md:block lg:hidden whitespace-nowrap z-50">
+                Logout
+              </span>
+            </button>
+          </div>
         </nav>
-      </div>
+      </aside>
     </>
   );
 };

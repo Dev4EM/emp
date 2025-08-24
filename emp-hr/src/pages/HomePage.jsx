@@ -3,11 +3,16 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PersonIcon from '@mui/icons-material/Person';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import SpeedIcon from '@mui/icons-material/Speed';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AttendCalen from '../components/AttendCalen';
 import { checkIn, checkOut, getUser } from '../components/Api';
+import CalendarMonthView from '../components/CalendarMonthView';
+
 import { useGeolocated } from 'react-geolocated';
 import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -19,17 +24,17 @@ function HomePage() {
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const {
-    coords,
-    isGeolocationAvailable,
-    isGeolocationEnabled,
-  } = useGeolocated({
-    positionOptions: {
-      enableHighAccuracy: true,
-    },
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  const { coords, isGeolocationAvailable, isGeolocationEnabled } = useGeolocated({
+    positionOptions: { enableHighAccuracy: true },
     userDecisionTimeout: 5000,
   });
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const extractTodayAttendance = (attendanceList) => {
     const today = new Date();
@@ -44,6 +49,7 @@ function HomePage() {
   };
 
   const formatTime = (isoTime) => {
+    if (!isoTime) return 'N/A';
     return new Date(isoTime).toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -51,33 +57,17 @@ function HomePage() {
     });
   };
 
-  const formatDateTime = (isoTime) => {
-    return new Date(isoTime).toLocaleString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      day: 'numeric',
-      month: 'short',
-    });
-  };
-
   const calculateWorkDuration = (checkInTime, checkOutTime) => {
     if (!checkInTime || !checkOutTime) return null;
-    
-    const checkIn = new Date(checkInTime);
-    const checkOut = new Date(checkOutTime);
-    const diffMs = checkOut - checkIn;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+    const diffMs = new Date(checkOutTime) - new Date(checkInTime);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffMinutes = Math.floor((diffMs % 3600000) / 60000);
     return `${diffHours}h ${diffMinutes}m`;
   };
 
   const fetchAddress = async (lat, lng) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
-      );
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
       const data = await response.json();
       return data.display_name || 'Address not found';
     } catch (error) {
@@ -90,7 +80,6 @@ function HomePage() {
     try {
       const userData = await getUser();
       setUser(userData);
-
       const todayAttendance = extractTodayAttendance(userData.attendance || []);
       if (todayAttendance?.checkIn) {
         setCheckInTime(todayAttendance.checkIn);
@@ -114,16 +103,12 @@ function HomePage() {
       toast.error('Please enable location services to check in.');
       return;
     }
-
     setIsProcessing(true);
     try {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
-      const location = { lat: latitude, lng: longitude, address };
-
-      const response = await checkIn(location);
-      const checkInISO = response.attendance.checkIn;
-      setCheckInTime(checkInISO);
+      const response = await checkIn({ lat: latitude, lng: longitude, address });
+      setCheckInTime(response.attendance.checkIn);
       setHasCheckedIn(true);
       setCheckInAddress(address);
       toast.success(response.message);
@@ -139,14 +124,11 @@ function HomePage() {
       toast.error('Please enable location services to check out.');
       return;
     }
-
     setIsProcessing(true);
     try {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
-      const location = { lat: latitude, lng: longitude, address };
-
-      const response = await checkOut(location);
+      const response = await checkOut({ lat: latitude, lng: longitude, address });
       setCheckOutTime(new Date().toISOString());
       setHasCheckedOut(true);
       setCheckOutAddress(address);
@@ -164,177 +146,120 @@ function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-900">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-400"></div>
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   const workDuration = calculateWorkDuration(checkInTime, checkOutTime);
 
+  const ActionButton = () => {
+    if (!hasCheckedIn) {
+      return (
+        <button onClick={handleCheckIn} disabled={isProcessing} className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center disabled:bg-blue-400">
+          {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <><LoginOutlinedIcon className="mr-2" /> Check In</>}
+        </button>
+      );
+    }
+    if (!hasCheckedOut) {
+      return (
+        <button onClick={handleCheckOut} disabled={isProcessing} className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center disabled:bg-blue-400">
+          {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <><LogoutOutlinedIcon className="mr-2" /> Check Out</>}
+        </button>
+      );
+    }
+    return (
+      <div className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center">
+        <EventAvailableIcon className="mr-2" /> Day Complete
+      </div>
+    );
+  };
+
+  const InfoCard = ({ icon, title, time, address }) => (
+    <div className="bg-white p-4 rounded-lg shadow-sm">
+      <div className="flex items-start space-x-4">
+        <div className="bg-blue-100 text-blue-600 p-3 rounded-lg">{icon}</div>
+        <div>
+          <p className="text-slate-600 text-sm">{title}</p>
+          <p className="text-slate-800 font-bold text-lg">{time}</p>
+          {address && 
+            <div className="flex items-start text-xs text-slate-500 mt-1">
+              <LocationOnIcon style={{ fontSize: '0.875rem' }} className="mr-1 mt-0.5"/>
+              <span className="truncate">{address}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <ToastContainer theme="colored" />
-      <div className="min-h-screen bg-gray-900">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
-              
-              {/* Welcome Section */}
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/10 p-3 rounded-full">
-                  <PersonIcon className="text-2xl" />
+      <ToastContainer theme="light" position="top-right" autoClose={3000} hideProgressBar={false} />
+      <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          
+          <header className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-800">Welcome, {user?.["First name"] || 'User'}!</h1>
+            <p className="text-slate-600 mt-1">
+              {currentTime.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </header>
+
+          <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white p-6 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="text-center md:text-left">
+                  <p className="text-slate-600">Current Time</p>
+                  <p className="text-4xl font-bold text-slate-800">{currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                 </div>
-                <div>
-                  <h1 className="text-2xl lg:text-3xl font-bold">
-                    Welcome, {user?.["First name"] || 'User'}!
-                  </h1>
-                  <p className="text-blue-200 text-sm lg:text-base">
-                    May your orbit be steady and your stars aligned.
-                  </p>
-                  <p className="text-blue-300 text-xs lg:text-sm mt-1">
-                    {user?.Designation || 'Employee'} • {user?.Department || 'Department'}
-                  </p>
+                <div className="w-full md:w-48">
+                  <ActionButton />
                 </div>
               </div>
 
-              {/* Date and Attendance Controls */}
-              <div className="flex flex-col items-start lg:items-end space-y-3">
-                <div className="text-right">
-                  <p className="text-lg font-semibold">
-                    {new Date().toLocaleDateString('en-GB', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </p>
-                  <p className="text-sm text-blue-200">
-                    {new Date().toLocaleTimeString('en-IN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </p>
+              {(hasCheckedIn || hasCheckedOut) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked In" time={formatTime(checkInTime)} address={checkInAddress} />}
+                  {hasCheckedOut && <InfoCard icon={<LogoutOutlinedIcon />} title="Checked Out" time={formatTime(checkOutTime)} address={checkOutAddress} />}
+                  {workDuration && <InfoCard icon={<SpeedIcon />} title="Work Duration" time={workDuration} />}
                 </div>
-
-                {/* Check In/Out Buttons */}
-                <div className="flex flex-col space-y-2 w-full lg:w-auto">
-                  {!hasCheckedIn ? (
-                    <button
-                      onClick={handleCheckIn}
-                      disabled={isProcessing}
-                      className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-500 px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center justify-center space-x-2 min-w-[150px]"
-                    >
-                      {isProcessing ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <>
-                          <LoginOutlinedIcon />
-                          <span>Check In</span>
-                        </>
-                      )}
-                    </button>
-                  ) : !hasCheckedOut ? (
-                    <button
-                      onClick={handleCheckOut}
-                      disabled={isProcessing}
-                      className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-500 px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center justify-center space-x-2 min-w-[150px]"
-                    >
-                      {isProcessing ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <>
-                          <LogoutOutlinedIcon />
-                          <span>Check Out</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="bg-green-600 px-6 py-3 rounded-lg font-semibold text-center min-w-[150px]">
-                      Day Complete ✓
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
-          </div>
-        </div>
 
-        {/* Attendance Status Cards */}
-        {(hasCheckedIn || hasCheckedOut) && (
-          <div className="bg-gray-800 border-b border-gray-700">
-            <div className="container mx-auto px-4 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                {/* Check In Status */}
-                {hasCheckedIn && (
-                  <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-green-600 p-2 rounded-full">
-                        <LoginOutlinedIcon className="text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-white font-semibold">Checked In</h3>
-                        <div className="flex items-center space-x-1 text-green-400 text-sm">
-                          <AccessTimeIcon className="text-xs" />
-                          <span>{formatTime(checkInTime)}</span>
-                        </div>
-                        <div className="flex items-start space-x-1 text-gray-400 text-xs mt-1">
-                          <LocationOnIcon className="text-xs mt-0.5" />
-                          <span className="truncate">{checkInAddress}</span>
-                        </div>
-                      </div>
-                    </div>
+            <aside className="space-y-6">
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <h3 className="font-bold text-slate-800 mb-4">Quick Stats</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 text-sm">Attendance This Month</span>
+                    <span className="font-bold text-slate-800">{user?.attendance?.length || 0} days</span>
                   </div>
-                )}
-
-                {/* Check Out Status */}
-                {hasCheckedOut && (
-                  <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-orange-600 p-2 rounded-full">
-                        <LogoutOutlinedIcon className="text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-white font-semibold">Checked Out</h3>
-                        <div className="flex items-center space-x-1 text-orange-400 text-sm">
-                          <AccessTimeIcon className="text-xs" />
-                          <span>{formatTime(checkOutTime)}</span>
-                        </div>
-                        <div className="flex items-start space-x-1 text-gray-400 text-xs mt-1">
-                          <LocationOnIcon className="text-xs mt-0.5" />
-                          <span className="truncate">{checkOutAddress}</span>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 text-sm">Paid Leave Balance</span>
+                    <span className="font-bold text-slate-800">{user?.paidLeaveBalance || 0}</span>
                   </div>
-                )}
-
-                {/* Work Duration */}
-                {workDuration && (
-                  <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-blue-600 p-2 rounded-full">
-                        <AccessTimeIcon className="text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-semibold">Work Duration</h3>
-                        <p className="text-blue-400 text-sm">{workDuration}</p>
-                        <p className="text-gray-400 text-xs">Today's total</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </aside>
+          </main>
 
-        {/* Calendar Component */}
-        <div className="container mx-auto px-4 py-6">
-          <AttendCalen />
+         
+<section className="mt-8">
+  <div className="bg-white p-6 rounded-lg shadow-sm">
+    <h2 className="text-xl font-bold text-slate-800 mb-4">Attendance Calendar</h2>
+    <CalendarMonthView
+      attendance={user?.attendance || []}
+      onDaySelect={(date, record) => {
+        // Optional: show a toast or open a modal with full day details
+        // Example:
+        // toast.info(record ? `In: ${record.checkIn}\nOut: ${record.checkOut || 'N/A'}` : 'No attendance record');
+      }}
+    />
+  </div>
+</section>
+
         </div>
       </div>
     </>
