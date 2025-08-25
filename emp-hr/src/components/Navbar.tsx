@@ -27,7 +27,7 @@ const Navbar = ({ toggleSidebar, fixed = false }) => {
           </button>
 
           <h1 className="text-base md:text-lg font-bold text-[#051b56]">
-            EMP System
+           <span className='text-[#e96101]'> EM</span> People
           </h1>
         </div>
 
