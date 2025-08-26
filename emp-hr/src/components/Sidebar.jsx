@@ -105,7 +105,7 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
       >
         {/* Header + Close for mobile */}
         <div className="flex items-center justify-between p-4 md:justify-center">
-          <h2 className="text-sm font-bold text-[#051b56] md:hidden lg:block">EMP System</h2>
+          <h2 className="text-lg font-bold text-[#051b56] md:hidden lg:block"><span className='text-[#e96101]'> EM</span> People</h2>
           <button
             onClick={onCloseSidebar}
             className="p-2 rounded hover:bg-gray-200 md:hidden"

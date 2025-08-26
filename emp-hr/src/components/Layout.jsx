@@ -18,7 +18,7 @@ const Layout = ({ children }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen font-josefin bg-gray-50">
       {/* Mobile fixed navbar */}
       <div className="md:hidden">
         <Navbar toggleSidebar={toggleSidebar} fixed />

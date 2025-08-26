@@ -184,9 +184,9 @@ function HomePage() {
           <p className="text-slate-600 text-sm">{title}</p>
           <p className="text-slate-800 font-bold text-lg">{time}</p>
           {address && 
-            <div className="flex items-start text-xs text-slate-500 mt-1">
+            <div className="flex items-start justify-start text-xs text-slate-500 mt-1">
               <LocationOnIcon style={{ fontSize: '0.875rem' }} className="mr-1 mt-0.5"/>
-              <span className="truncate">{address}</span>
+              <span className="truncate max-w-[150px]">{address}</span>
             </div>
           }
         </div>
@@ -220,8 +220,8 @@ function HomePage() {
               </div>
 
               {(hasCheckedIn || hasCheckedOut) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked In" time={formatTime(checkInTime)} address={checkInAddress} />}
+                <div className="grid grid-cols-1 md:grid-cols-2  gap-6">
+                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked  In" time={formatTime(checkInTime)} address={checkInAddress} />}
                   {hasCheckedOut && <InfoCard icon={<LogoutOutlinedIcon />} title="Checked Out" time={formatTime(checkOutTime)} address={checkOutAddress} />}
                   {workDuration && <InfoCard icon={<SpeedIcon />} title="Work Duration" time={workDuration} />}
                 </div>

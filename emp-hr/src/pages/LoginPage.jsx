@@ -41,12 +41,12 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-tr from-emerald-900 via-emerald-700 to-gray-900 px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen font-josefin w-full flex items-center justify-center bg-gradient-to-tr from-emerald-900 via-emerald-700 to-gray-900 px-4 py-12 relative overflow-hidden">
 
      
       <div className="relative flex w-full max-w-4xl items-stretch shadow-2xl rounded-3xl overflow-hidden">
         {/* Branding Section */}
-        <div className="hidden lg:flex flex-col justify-between items-center bg-gradient-to-tr from-emerald-900 to-emerald-600 px-12 py-16 w-2/5 min-h-[500px] text-white z-10">
+        <div className="hidden lg:flex flex-col justify-between items-center bg-gradient-to-tr from-emerald-900 to-emerald-600 px-12 py-16 w-3/5 min-h-[500px] text-white z-10">
           <div className="flex flex-col items-center gap-2">
             <img src="./esroMagicaSpLogo.png" width={80} alt="EM Logo" className="rounded-lg bg-black p-2 shadow-md" />
             <span className="text-4xl font-extrabold tracking-tight">
@@ -98,9 +98,9 @@ function LoginPage() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-sm mx-auto">
+          <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-sm mx-auto">
             {/* Email */}
-            <div className="flex flex-col">
+            <div className="flex flex-col items-start">
               <label className="text-sm font-semibold text-gray-400 mb-2">
                 Email Address
               </label>
@@ -116,7 +116,7 @@ function LoginPage() {
             </div>
 
             {/* Password */}
-            <div className="flex flex-col relative">
+            <div className="flex flex-col relative items-start">
               <label className="text-sm font-semibold text-gray-400 mb-2">
                 Password
               </label>
@@ -141,7 +141,7 @@ function LoginPage() {
 
             <div className="flex items-center justify-between">
               <a href="#" className="text-sm font-medium text-emerald-400 hover:text-orange-400 transition-colors duration-200">
-                Forgot password?
+                {/* Forgot password? */}
               </a>
             </div>
 
