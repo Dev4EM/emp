@@ -18,7 +18,8 @@ import AddEmployeePage from './pages/AddEmployeePage';
 import ManageEmployeesPage from './pages/ManageEmployeesPage.jsx';
 import TeamAttendancePage from './pages/TeamAttendancePage';
 import ManageAppPage from './pages/ManageAppPage';
-
+import AddUserPage from './pages/AddUserPage';
+ 
 // A component to conditionally render the layout
 const AppContent = () => {
   const location = useLocation();
@@ -44,11 +45,12 @@ const AppContent = () => {
               <Route path="/leave-balance" element={<LeaveBalancePage />} />
               <Route path="/past-leaves" element={<PastLeavesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/add-employee" element={<AddEmployeePage />} />
+              <Route path="/add-employee" element={<AddUserPage />} />
               <Route path="/manage-employees" element={<ManageEmployeesPage />} />
               <Route path="/team-attendance" element={<TeamAttendancePage />} />
               <Route path="/manage-app" element={<ManageAppPage />} />
             </Route>
+
           </Routes>
         </Layout>
       )}

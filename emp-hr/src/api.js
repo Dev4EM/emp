@@ -25,14 +25,15 @@ const api = {
       body: JSON.stringify(credentials),
     });
   },
-
-  // You can add more API functions here later
-  // For example:
-  // getProfile: async (token) => {
-  //   return request('/user/profile', {
-  //     headers: { 'Authorization': `Bearer ${token}` }
-  //   });
-  // }
+  addUser: async (userData) => {
+    return request('/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+  }
 };
 
 export default api;

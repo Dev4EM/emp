@@ -41,7 +41,7 @@ router.get('/leave-balance', auth, async (req, res) => {
 
 // POST /api/employee/apply-leave
 router.post('/apply-leave', auth, async (req, res) => {
-  const { leaveDate, leaveType, leaveDuration, reason } = req.body;
+  const { leaveDate, leaveType, leaveDuration, leaveHalf, reason } = req.body;
   const duration = leaveDuration === 0.5 ? 0.5 : 1;
 
   if (!leaveDate || !leaveType || !reason) {
@@ -49,6 +49,9 @@ router.post('/apply-leave', auth, async (req, res) => {
   }
   if (leaveType !== 'paid' && leaveType !== 'unpaid') {
     return res.status(400).json({ message: 'Invalid leave type.' });
+  }
+  if (duration === 0.5 && (!leaveHalf || (leaveHalf !== 'first' && leaveHalf !== 'second'))) {
+    return res.status(400).json({ message: 'Invalid half-day specification.' });
   }
 
   try {
@@ -68,6 +71,7 @@ router.post('/apply-leave', auth, async (req, res) => {
       date: leaveDate, 
       type: leaveType, 
       duration: duration,
+      half: duration === 0.5 ? leaveHalf : null,
       reason: reason,
       status: 'pending'
     });
@@ -181,6 +185,25 @@ router.post('/check-out', auth, async (req, res) => {
       attendance: todayAttendance
     });
 
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server Error' });
+  }
+});
+// DELETE /api/employee/delete-leave/:leaveId
+router.delete('/delete-leave/:leaveId', auth, async (req, res) => {
+  const { leaveId } = req.params;
+   try {
+    // Only pending/cancellable leaves should be deletable
+    const result = await User.findOneAndUpdate(
+      { _id: req.user.id, 'leaves._id': leaveId },
+      { $pull: { leaves: { _id: leaveId, status: 'pending' } } }, // Only delete if pending
+      { new: true }
+    );
+    if (!result) {
+      return res.status(404).json({ message: 'Leave not found, or cannot be cancelled' });
+    }
+    return res.status(200).json({ message: 'Leave cancelled successfully' });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server Error' });

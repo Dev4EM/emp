@@ -22,3 +22,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+curl -X POST "https://graph.facebook.com/v19.0/me/messages?access_token=EAAT4CVCf2xMBPX7dqKoNjO1szeZCvtcf8c7RflkkuSmO4lKRM7ZCRZCBU7rYqUFZAlmwpSC3mHBUIsr9jucMYEJsSOtlnCGN0yu9QSswCEkolLzaOd1PglZAC6NNFrjZBdk2pZBDUf6OLN2CPccumK5PBra0n6xWXhh2I6Q7sPFVD3NiDu8UIwPiMQZBdqx9vSvzGs1sZAzAoGjcDqAspUX7ZCQLZCIsGZBEZB8ArWtAPR50jDZAswZAwZDZD" 
+  -H "Content-Type: application/json" 
+  -d '{
+    "recipient": {"id":""},
+    "message": {"text":"Hello from n8n Instagram bot!"}
+  }'
+curl -X POST  https://graph.facebook.com/v19.0/17841454441698452/messages
+curl -X POST "https://graph.facebook.com/v19.0/17841454441698452/messages" 
+ -H "Authorization: Bearer EAAT4CVCf2xMBPaN38nc3e4fW3nD6ZCuh1pYQe6WscCQUqTcEMw8KNxb5IIvwpSNkvmXbcJic1VpU8VatZBZCjMik9Uk6dsckGfnjJZAQYimEZC4CeOTIvAQZAKXGs0JOTrZANOrLE5GHXYTsatD6m2954NRaE7AxAET8Yo3zCeMIMSshwOVtUzM1TVuwEgBZBFZChEFSZCBfY2emGBcLxfiC3r7RvUQsg4qFbSKEQZC" 
+ -H "Content-Type: application/json" 
+ -d '{
+       "recipient": {
+         "id": "747738491378239"
+       },
+       "message": {
+         "text": "Hello from Esromagica Instagram Bot! How can we assist you today?"
+       }
+     }'

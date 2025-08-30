@@ -8,7 +8,7 @@ const teamLeaderRoutes = require('./routes/teamleader'); // NEW IMPORT
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin'); // Add this import
 const userRoutes = require('./routes/user');
- 
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -28,7 +28,7 @@ app.get('/', (req, res) => {
 
 
 // API Routes
- app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/employee', employeeRoutes); // 2. Use the new routes with a prefix
 app.use('/api/teamleader', teamLeaderRoutes); // NEW ROUTE

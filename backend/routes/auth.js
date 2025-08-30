@@ -42,14 +42,14 @@ router.put('/change-password', auth, async (req, res) => {
 });
 
 // POST /api/auth/register
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
-  const { firstName, lastName, workEmail, password } = req.body;
   try {
-    let user = await User.findOne({ workEmail });
+    let user = await User.findOne({ "Work email": req.body["Work email"] });
     if (user) {
       return res.status(400).json({ message: 'User already exists' });
     }
-    user = new User({ firstName, lastName, workEmail, password });
+    user = new User(req.body);
     await user.save();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {

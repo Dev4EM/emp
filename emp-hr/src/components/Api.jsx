@@ -17,6 +17,16 @@ API.interceptors.request.use((config) => {
   return config;
 });
 // ----------------- API FUNCTIONS ------------------
+// Download all employees' attendance CSV
+export const downloadAllAttendanceCSV = () => {
+  // This returns a full URL that can be used in an <a> tag or window.open()
+  return `${API.defaults.baseURL}/admin/attendance/all/csv`;
+};
+
+// Download individual employee attendance CSV by userId
+export const downloadEmployeeAttendanceCSV = (userId) => {
+  return `${API.defaults.baseURL}/admin/attendance/${userId}/csv`;
+};
 
 // Auth APIs
 export const loginUser = async (credentials) => {
@@ -70,6 +80,12 @@ export const getPastLeaves = async (page = 1, limit = 10) => {
     const response = await API.get(`/employee/past-leaves?page=${page}&limit=${limit}`);
     return response.data;
 };
+export const cancelLeave = async (leaveToCancel, leaves, setLeaves, closeCancelModal, toast) => {
+  const response = await API.delete(`/employee/delete-leave/${leaveToCancel}`);
+  console.log('Cancel leave response:', response); // Debug log
+  return response.data;
+}
+ 
 export const checkIn = async (locationData) => {
   const response = await API.post('/employee/check-in', {
     location: locationData,
@@ -95,6 +111,11 @@ export const getTeamAttendance = async () => {
 
 export const getPendingLeaves = async () => {
   const response = await API.get('/teamleader/pending-leaves');
+  return response.data;
+};
+
+export const getDepartmentLeaves = async () => {
+  const response = await API.get('/teamleader/department-leaves');
   return response.data;
 };
 export const approveLeave = async (employeeId, leaveId) => {

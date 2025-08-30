@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const json2csv = require('json2csv').parse;
+
+function calculateAttendanceStatus(checkIn, checkOut) {
+  if (!checkIn || !checkOut) {
+    return { totalHours: 0, status: 'Absent' };
+  }
+  const hours = (new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60);
+  return {
+    totalHours: hours,
+    status: hours >= 8.45 ? 'Present' : 'Absent',
+  };
+}
 
 // Middleware to check if user is an admin
 const checkAdmin = (req, res, next) => {
@@ -10,6 +22,156 @@ const checkAdmin = (req, res, next) => {
   }
   next();
 };
+router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
+  try {
+    const users = await User.find().select('attendance First name Last name');
+
+    const records = [];
+    users.forEach(user => {
+      user.attendance.forEach(a => {
+        const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+        records.push({
+          Employee: `${user["First name"]} ${user["Last name"]}`,
+          Date: a.date.toISOString().split('T')[0],
+          'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
+          'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
+          'Total Hours': totalHours.toFixed(2),
+          Status: status
+        });
+      });
+    });
+
+    const csv = json2csv(records);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`all_employees_attendance.csv`);
+    return res.send(csv);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({message:'Server error'});
+  }
+});
+router.get('/attendance/:employeeId/csv', auth, checkAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.employeeId);
+    if(!user) return res.status(404).json({message: "User not found"});
+
+    const records = user.attendance.map(a => {
+      const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+      return {
+        Date: a.date.toISOString().split('T')[0],
+        'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
+        'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
+        'Total Hours': totalHours.toFixed(2),
+        Status: status
+      };
+    });
+
+    const csv = json2csv(records);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`${user["First name"]}_attendance.csv`);
+    return res.send(csv);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({message:'Server error'});
+  }
+});
+
+// ROUTE: POST /api/admin/adduser
+// DESC: Add a new user
+router.post('/adduser', auth, checkAdmin, async (req, res) => {
+  try {
+    const {
+      "Prefix": prefix,
+      "First name": firstName,
+      "Last name": lastName,
+      "Date of birth": dob,
+      "Gender": gender,
+      "Blood group": bloodGroup,
+      "Nationality": nationality,
+      "Work email": workEmail,
+      "Mobile number": mobileNumber,
+      "ISDcode": isdCode,
+      password,
+      "Employee Code": employeeCode,
+      "Date of joining": doj,
+      "Employment type": employmentType,
+      "Employment status": employmentStatus,
+      "Company": company,
+      "Business Unit": businessUnit,
+      "Department": department,
+      "Sub department": subDepartment,
+      "Designation": designation,
+      "Region": region,
+      "Branch": branch,
+      "Sub branch": subBranch,
+      "Shift": shift,
+      "Level": level,
+      "Skill Type": skillType,
+      "Date of Confirmation": doc,
+      "Employee Other Status": employeeOtherStatus,
+      userType,
+      "Reporting manager": reportingManager,
+      "Functional manager": functionalManager,
+    } = req.body;
+
+    // Check if user already exists
+    let user = await User.findOne({ "Work email": workEmail });
+    if (user) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    user = new User({
+      "Prefix": prefix,
+      "First name": firstName,
+      "Last name": lastName,
+      "Date of birth": dob,
+      "Gender": gender,
+      "Blood group": bloodGroup,
+      "Nationality": nationality,
+      "Work email": workEmail,
+      "Mobile number": mobileNumber,
+      "ISDcode": isdCode,
+      password, // In a real app, this should be hashed
+      "Employee Code": employeeCode,
+      "Date of joining": doj,
+      "Employment type": employmentType,
+      "Employment status": employmentStatus,
+      "Company": company,
+      "Business Unit": businessUnit,
+      "Department": department,
+      "Sub department": subDepartment,
+      "Designation": designation,
+      "Region": region,
+      "Branch": branch,
+      "Sub branch": subBranch,
+      "Shift": shift,
+      "Level": level,
+      "Skill Type": skillType,
+      "Date of Confirmation": doc,
+      "Employee Other Status": employeeOtherStatus,
+      userType,
+      "Reporting manager": reportingManager,
+      "Functional manager": functionalManager,
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user,
+    });
+  } catch (error) {
+    console.error('Error adding new user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message,
+    });
+  }
+});
 
 // ROUTE: GET /api/admin/all-users
 // DESC: Get all users for admin management

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { getPastLeaves } from '../components/Api';
+import { getPastLeaves , cancelLeave } from '../components/Api';
 import { toast, ToastContainer } from 'react-toastify';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
+import Modal from '../components/Modal'; // Import the Modal component
 
 const statusColors = {
   pending: 'bg-yellow-500',
@@ -21,6 +22,8 @@ function PastLeavesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [leaveToCancel, setLeaveToCancel] = useState(null);
 
   const fetchLeaves = async (page) => {
     setIsLoading(true);
@@ -46,12 +49,36 @@ function PastLeavesPage() {
     }
   };
 
+  const openCancelModal = (leaveId) => {
+    setLeaveToCancel(leaveId);
+    setIsModalOpen(true);
+  };
+
+  const closeCancelModal = () => {
+    setLeaveToCancel(null);
+    setIsModalOpen(false);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (leaveToCancel) {
+      try {
+        cancelLeave(leaveToCancel);
+        toast.success('Leave cancelled!');
+        setLeaves(leaves.filter(l => l._id !== leaveToCancel)); // Remove cancelled leave from UI
+      } catch (err) {
+        toast.error('Failed to cancel leave.');
+      } finally {
+        closeCancelModal();
+      }
+    }
+  };
+
   const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'long', 
+    const options = {
+      year: 'numeric',
+      month: 'long',
       day: 'numeric',
-      weekday: 'short' 
+      weekday: 'short'
     };
     return new Date(dateString).toLocaleDateString('en-US', options);
   };
@@ -83,7 +110,7 @@ function PastLeavesPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-emerald-400 mb-4">My Past Leaves</h1>
-          
+
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
@@ -123,6 +150,7 @@ function PastLeavesPage() {
                       <th className="px-6 py-4 text-sm font-semibold text-gray-300">Status</th>
                       <th className="px-6 py-4 text-sm font-semibold text-gray-300">Applied On</th>
                       <th className="px-6 py-4 text-sm font-semibold text-gray-300">Reason</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Cancel Leave</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
@@ -158,7 +186,19 @@ function PastLeavesPage() {
                             {leave.reason || 'No reason provided'}
                           </p>
                         </td>
+                        <td>
+                          {leave.status === 'pending' && (
+                            <button
+                              className="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded"
+                              onClick={() => openCancelModal(leave._id)}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </td>
+
                       </tr>
+
                     ))}
                   </tbody>
                 </table>
@@ -178,7 +218,7 @@ function PastLeavesPage() {
                       {leave.status?.toUpperCase()}
                     </span>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-400">Type:</span>
@@ -186,7 +226,7 @@ function PastLeavesPage() {
                         {leave.type?.toUpperCase()}
                       </span>
                     </div>
-                    
+
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-400">Duration:</span>
                       <div className="flex items-center">
@@ -194,14 +234,14 @@ function PastLeavesPage() {
                         <span className="text-sm">{leave.duration === 1 ? 'Full Day' : 'Half Day'}</span>
                       </div>
                     </div>
-                    
+
                     {leave.appliedOn && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-400">Applied On:</span>
                         <span className="text-sm">{formatAppliedDate(leave.appliedOn)}</span>
                       </div>
                     )}
-                    
+
                     <div className="mt-4">
                       <p className="text-sm text-gray-400 mb-1">Reason:</p>
                       <p className="text-sm bg-gray-700 p-3 rounded">
@@ -216,14 +256,14 @@ function PastLeavesPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center space-x-2">
-                <button 
-                  onClick={() => handlePageChange(currentPage - 1)} 
-                  disabled={currentPage === 1} 
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
                   className="px-4 py-2 bg-gray-700 text-white rounded-l-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                
+
                 <div className="flex space-x-1">
                   {[...Array(totalPages)].map((_, index) => {
                     const page = index + 1;
@@ -231,21 +271,20 @@ function PastLeavesPage() {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`px-3 py-2 rounded transition-colors ${
-                          currentPage === page
+                        className={`px-3 py-2 rounded transition-colors ${currentPage === page
                             ? 'bg-emerald-600 text-white'
                             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
                     );
                   })}
                 </div>
-                
-                <button 
-                  onClick={() => handlePageChange(currentPage + 1)} 
-                  disabled={currentPage === totalPages} 
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
                   className="px-4 py-2 bg-gray-700 text-white rounded-r-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
@@ -261,6 +300,14 @@ function PastLeavesPage() {
           </div>
         )}
       </div>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeCancelModal}
+        onConfirm={handleConfirmCancel}
+        title="Confirm Cancellation"
+      >
+        Are you sure you want to cancel this leave request?
+      </Modal>
     </div>
   );
 }

@@ -62,6 +62,7 @@ const UserSchema = new mongoose.Schema({
             date: { type: Date, required: true },
             type: { type: String, enum: ['paid', 'unpaid'], required: true },
             duration: { type: Number, enum: [1, 0.5], default: 1 },
+            half: { type: String, enum: ['first', 'second', null], default: null },
             status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
             reason: { type: String, trim: true },
             appliedOn: { type: Date, default: Date.now },

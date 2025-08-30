@@ -17,7 +17,7 @@ import { format, isSameDay, isWeekend, isPast } from 'date-fns';
 function ApplyLeavePage() {
   const [selectedDates, setSelectedDates] = useState([]);
   const [leaveType, setLeaveType] = useState('paid');
-  const [leaveDuration, setLeaveDuration] = useState(1);
+  const [dateDetails, setDateDetails] = useState({});
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [leaveBalance, setLeaveBalance] = useState(null);
@@ -39,26 +39,36 @@ function ApplyLeavePage() {
     fetchLeaveBalance();
   }, []);
 
-  const handleDateSelect = (date) => {
-    if (!date) return;
-    
-    setSelectedDates(currentDates => {
-      const isAlreadySelected = currentDates.some(selectedDate => 
-        isSameDay(selectedDate, date)
-      );
-      
-      if (isAlreadySelected) {
-        return currentDates.filter(selectedDate => !isSameDay(selectedDate, date));
-      } else {
-        return [...currentDates, date];
-      }
+  const handleDayPickerSelect = (dates) => {
+    const newDates = dates || [];
+    setSelectedDates(newDates);
+
+    setDateDetails(currentDetails => {
+      const newDetails = {};
+      newDates.forEach(date => {
+        const dateString = format(date, 'yyyy-MM-dd');
+        if (currentDetails[dateString]) {
+          newDetails[dateString] = currentDetails[dateString];
+        } else {
+          newDetails[dateString] = { duration: 1, half: null };
+        }
+      });
+      return newDetails;
     });
   };
 
-  const removeDate = (dateToRemove) => {
-    setSelectedDates(currentDates => 
-      currentDates.filter(date => !isSameDay(date, dateToRemove))
-    );
+  const handleDateDetailsChange = (dateString, field, value) => {
+    setDateDetails(currentDetails => {
+      const newDetails = { ...currentDetails };
+      if (!newDetails[dateString]) {
+        newDetails[dateString] = { duration: 1, half: null };
+      }
+      newDetails[dateString][field] = value;
+      if (field === 'duration' && value === 1) {
+        newDetails[dateString].half = null;
+      }
+      return newDetails;
+    });
   };
 
   const clearAllDates = () => {
@@ -66,7 +76,7 @@ function ApplyLeavePage() {
   };
 
   const getTotalLeaveDays = () => {
-    return selectedDates.length * leaveDuration;
+    return Object.values(dateDetails).reduce((total, { duration }) => total + duration, 0);
   };
 
   const validateLeaveApplication = () => {
@@ -105,12 +115,17 @@ function ApplyLeavePage() {
     
     try {
       // Apply leave for each selected date
-      const leaveApplications = selectedDates.map(date => ({
-        leaveDate: format(date, 'yyyy-MM-dd'),
-        leaveType,
-        leaveDuration,
-        reason
-      }));
+      const leaveApplications = selectedDates.map(date => {
+        const dateString = format(date, 'yyyy-MM-dd');
+        const details = dateDetails[dateString];
+        return {
+          leaveDate: dateString,
+          leaveType,
+          leaveDuration: details.duration,
+          leaveHalf: details.half,
+          reason
+        };
+      });
 
       // Apply leaves sequentially
       for (const application of leaveApplications) {
@@ -121,8 +136,8 @@ function ApplyLeavePage() {
       
       // Reset form
       setSelectedDates([]);
+      setDateDetails({});
       setLeaveType('paid');
-      setLeaveDuration(1);
       setReason('');
       
       // Refresh leave balance
@@ -169,10 +184,7 @@ function ApplyLeavePage() {
                 <span className="text-gray-400">Leave Type:</span>
                 <span className="font-medium capitalize">{leaveType}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Duration per day:</span>
-                <span className="font-medium">{leaveDuration === 1 ? 'Full Day' : 'Half Day'}</span>
-              </div>
+              
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Days:</span>
                 <span className="font-bold text-emerald-400">{getTotalLeaveDays()} day(s)</span>
@@ -330,7 +342,7 @@ function ApplyLeavePage() {
                     selected={selectedDates}
                     onSelect={(dates) => setSelectedDates(dates || [])}
                     disabled={isDateDisabled}
-                    numberOfMonths={2}
+                    numberOfMonths={1}
                     showOutsideDays
                   />
                 </div>
@@ -353,26 +365,55 @@ function ApplyLeavePage() {
                   </h3>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {selectedDates.sort((a, b) => a - b).map((date, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between bg-gray-700/50 p-3 rounded-xl border border-gray-600/50"
-                      >
-                        <div>
-                          <p className="font-medium">{format(date, 'EEE, MMM dd')}</p>
-                          <p className="text-sm text-gray-400">{format(date, 'yyyy')}</p>
-                          {isWeekend(date) && (
-                            <span className="text-xs text-yellow-400">Weekend</span>
+                    {selectedDates.sort((a, b) => a - b).map((date, index) => {
+                      const dateString = format(date, 'yyyy-MM-dd');
+                      const details = dateDetails[dateString] || { duration: 1, half: null };
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex flex-col bg-gray-700/50 p-3 rounded-xl border border-gray-600/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{format(date, 'EEE, MMM dd')}</p>
+                              <p className="text-sm text-gray-400">{format(date, 'yyyy')}</p>
+                              {isWeekend(date) && (
+                                <span className="text-xs text-yellow-400">Weekend</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeDate(date)}
+                              className="p-1 hover:bg-red-500/20 rounded-lg transition-colors"
+                            >
+                              <DeleteIcon className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                          <div className="mt-2">
+                            <select
+                              value={details.duration}
+                              onChange={(e) => handleDateDetailsChange(dateString, 'duration', parseFloat(e.target.value))}
+                              className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md"
+                            >
+                              <option value={1}>Full Day</option>
+                              <option value={0.5}>Half Day</option>
+                            </select>
+                          </div>
+                          {details.duration === 0.5 && (
+                            <div className="mt-2">
+                              <select
+                                value={details.half}
+                                onChange={(e) => handleDateDetailsChange(dateString, 'half', e.target.value)}
+                                className="w-full p-2 bg-gray-800 border border-gray-600 rounded-md"
+                              >
+                                <option value="first">First Half</option>
+                                <option value="second">Second Half</option>
+                              </select>
+                            </div>
                           )}
                         </div>
-                        <button
-                          onClick={() => removeDate(date)}
-                          className="p-1 hover:bg-red-500/20 rounded-lg transition-colors"
-                        >
-                          <DeleteIcon className="w-4 h-4 text-red-400" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -446,20 +487,7 @@ function ApplyLeavePage() {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="flex items-center space-x-2 text-sm font-semibold text-gray-300 mb-3">
-                        <AccessTimeIcon className="w-4 h-4 text-blue-400" />
-                        <span>Duration per Day</span>
-                      </label>
-                      <select 
-                        value={leaveDuration} 
-                        onChange={(e) => setLeaveDuration(parseFloat(e.target.value))}
-                        className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-                      >
-                        <option value={1}>🌅 Full Day</option>
-                        <option value={0.5}>🕐 Half Day</option>
-                      </select>
-                    </div>
+                    
                   </div>
 
                   {/* Reason */}

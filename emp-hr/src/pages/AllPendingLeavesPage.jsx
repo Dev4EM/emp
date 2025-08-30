@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getAllLeaves, approveLeave, rejectLeave } from '../components/Api';
+import { getAllLeaves, getDepartmentLeaves, approveLeave, rejectLeave } from '../components/Api';
+import useUser from '../hooks/useUser';
 import { toast, ToastContainer } from 'react-toastify';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -15,6 +16,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'da
 import Modal from '../components/Modal';
 
 function AllLeavesPage() {
+  const { user, isLoading: userLoading } = useUser();
   const [allLeaves, setAllLeaves] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,21 +24,27 @@ function AllLeavesPage() {
   const [actionType, setActionType] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedLeaveForDetails, setSelectedLeaveForDetails] = useState(null);
   const [filterDepartment, setFilterDepartment] = useState('All');
   const [filterMonth, setFilterMonth] = useState('All');
   const [filterStatus, setFilterStatus] = useState('all');
   const [processingLeaves, setProcessingLeaves] = useState(new Set());
 
-  const fetchAllLeaves = async () => {
+  const fetchLeaves = async () => {
+    setIsLoading(true);
     try {
-      const response = await getAllLeaves();
-      console.log('All leaves response:', response);
-      
+      let response;
+      if (user.userType === 'admin') {
+        response = await getAllLeaves();
+      } else if (user.userType === 'teamleader') {
+        response = await getDepartmentLeaves();
+      }
       const leaves = response.leaves || response;
       setAllLeaves(leaves);
       setFilteredLeaves(leaves);
     } catch (err) {
-      console.error('Error fetching all leaves:', err);
+      console.error('Error fetching leaves:', err);
       toast.error(err.response?.data?.message || 'Failed to fetch leaves.');
     } finally {
       setIsLoading(false);
@@ -44,8 +52,10 @@ function AllLeavesPage() {
   };
 
   useEffect(() => {
-    fetchAllLeaves();
-  }, []);
+    if (user) {
+      fetchLeaves();
+    }
+  }, [user]);
 
   // Filter leaves based on selected criteria
   useEffect(() => {
@@ -105,6 +115,11 @@ function AllLeavesPage() {
     setRejectionReason('');
   };
 
+  const openDetailsModal = (leave) => {
+    setSelectedLeaveForDetails(leave);
+    setIsDetailsModalOpen(true);
+  };
+
   const handleApprove = async () => {
     if (!selectedLeave) return;
     
@@ -114,7 +129,7 @@ function AllLeavesPage() {
     try {
       await approveLeave(selectedLeave.employeeId, selectedLeave.leaveId);
       toast.success(`Leave approved for ${selectedLeave.employeeName}!`);
-      await fetchAllLeaves();
+      await fetchLeaves();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to approve leave.');
     } finally {
@@ -135,7 +150,7 @@ function AllLeavesPage() {
     try {
       await rejectLeave(selectedLeave.employeeId, selectedLeave.leaveId, rejectionReason);
       toast.success(`Leave rejected for ${selectedLeave.employeeName}!`);
-      await fetchAllLeaves();
+      await fetchLeaves();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to reject leave.');
     } finally {
@@ -198,7 +213,7 @@ function AllLeavesPage() {
   const departments = ['All', ...new Set(allLeaves.map(leave => leave.department).filter(Boolean))];
   const stats = getStats();
 
-  if (isLoading) {
+  if (isLoading || userLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-900">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-400"></div>
@@ -264,6 +279,50 @@ function AllLeavesPage() {
                 />
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Details Modal */}
+      <Modal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        title="Leave Request Details"
+      >
+        {selectedLeaveForDetails && (
+          <div className="space-y-6">
+            <div className="bg-gray-800 p-6 rounded-xl border border-gray-600">
+              <h4 className="text-lg font-semibold mb-4 text-emerald-400">Leave Request Details</h4>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Employee:</span>
+                  <span className="font-medium">{selectedLeaveForDetails.employeeName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Department:</span>
+                  <span className="font-medium">{selectedLeaveForDetails.department}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Date:</span>
+                  <span className="font-medium">{formatDate(selectedLeaveForDetails.date)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Type:</span>
+                  <span className={`px-2 py-1 rounded text-white text-xs ${getLeaveTypeColor(selectedLeaveForDetails.type)}`}>
+                    {selectedLeaveForDetails.type?.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Duration:</span>
+                  <span className="font-medium">{selectedLeaveForDetails.duration === 1 ? 'Full Day' : 'Half Day'}</span>
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+                <p className="text-xs text-gray-300 mb-2">Reason:</p>
+                <p className="text-sm">{selectedLeaveForDetails.reason}</p>
+              </div>
+            </div>
           </div>
         )}
       </Modal>
@@ -421,7 +480,7 @@ function AllLeavesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-700/50">
                   {filteredLeaves.map((leave) => (
-                    <tr key={`${leave.employeeId}-${leave.leaveId}`} className="hover:bg-gray-700/30 transition-colors">
+                    <tr key={`${leave.employeeId}-${leave.leaveId}`} onClick={() => openDetailsModal(leave)} className="hover:bg-gray-700/30 transition-colors cursor-pointer">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
                           <div className="p-2 bg-purple-500/20 rounded-full">
@@ -472,7 +531,7 @@ function AllLeavesPage() {
                           {leave.status === 'pending' ? (
                             <>
                               <button
-                                onClick={() => openConfirmationModal(leave, 'approve')}
+                                onClick={(e) => { e.stopPropagation(); openConfirmationModal(leave, 'approve'); }}
                                 disabled={processingLeaves.has(leave.leaveId)}
                                 className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg transition-all duration-200 flex items-center space-x-1 text-sm"
                               >
@@ -486,7 +545,7 @@ function AllLeavesPage() {
                                 )}
                               </button>
                               <button
-                                onClick={() => openConfirmationModal(leave, 'reject')}
+                                onClick={(e) => { e.stopPropagation(); openConfirmationModal(leave, 'reject'); }}
                                 disabled={processingLeaves.has(leave.leaveId)}
                                 className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg transition-all duration-200 flex items-center space-x-1 text-sm"
                               >

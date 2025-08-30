@@ -249,4 +249,47 @@ router.get('/team-attendance', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
+// GET /api/teamleader/department-leaves
+// DESC: Get all leaves from the team leader's department
+router.get('/department-leaves', auth, checkTeamLeader, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const department = currentUser.Department;
+
+    if (!department) {
+      return res.status(400).json({ message: 'You are not assigned to a department.' });
+    }
+
+    const usersInDepartment = await User.find({ Department: department });
+    console.log(department, usersInDepartment.length);
+    
+    const departmentLeaves = [];
+    usersInDepartment.forEach(user => {
+      user.leaves.forEach(leave => {
+        departmentLeaves.push({
+          leaveId: leave._id,
+          employeeId: user._id,
+          employeeName: `${user["First name"]} ${user["Last name"]}`,
+          employeeEmail: user["Work email"],
+          employeeCode: user["Employee Code"],
+          date: leave.date,
+          type: leave.type,
+          duration: leave.duration,
+          reason: leave.reason,
+          appliedOn: leave.appliedOn,
+          status: leave.status,
+        });
+      });
+    });
+
+    // Sort by applied date (newest first)
+    departmentLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
+
+    res.json(departmentLeaves);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
 module.exports = router;

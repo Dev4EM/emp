@@ -7,6 +7,7 @@ const useUser = () => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+
   useEffect(() => {
     const fetchUser = async () => {
       try {

@@ -12,7 +12,8 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BadgeIcon from '@mui/icons-material/Badge';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+ import { downloadEmployeeAttendanceCSV } from '../components/Api';
+
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
@@ -154,6 +155,8 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
             >
               <CloseIcon className="text-gray-400 hover:text-white" />
             </button>
+            {/* Download Attendance CSV Button */}
+ 
           </div>
 
           {/* Content */}
@@ -173,7 +176,7 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
               </div>
 
               {/* Quick Stats Grid */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-emerald-500/20 rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-emerald-400">{user.paidLeaveBalance || 0}</p>
                   <p className="text-xs text-gray-400">Leave Balance</p>
@@ -182,6 +185,17 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
                   <p className="text-2xl font-bold text-blue-400">{user.attendance?.length || 0}</p>
                   <p className="text-xs text-gray-400">Attendance Days</p>
                 </div>
+                <div className="bg-blue-500/20 rounded-xl p-4 text-center">
+                             {/* Download Attendance CSV Button */}
+   <button
+    onClick={() => window.open(downloadEmployeeAttendanceCSV(user._id), '_blank')}
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded    space-x-2"
+  >
+     <span>Download Attendance</span>
+  </button>
+ 
+                </div>
+                
               </div>
 
               {/* Attendance Calendar */}

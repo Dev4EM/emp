@@ -134,6 +134,8 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
               <div className="space-y-1">
                 <Item to="/team-members" icon={SupervisedUserCircleOutlinedIcon} text="My Team" hover="hover:bg-blue-100" />
                 <Item to="/pending-leaves" icon={AssignmentLateOutlinedIcon} text="Pending Leaves" hover="hover:bg-orange-100" />
+                                <Item to="/all-leaves" icon={AssignmentLateOutlinedIcon} text="All Leaves" hover="hover:bg-red-100" />
+
                 <Item to="/team-attendance" icon={BarChartOutlinedIcon} text="Team Attendance" hover="hover:bg-green-100" />
               </div>
             </div>
