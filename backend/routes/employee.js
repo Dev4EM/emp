@@ -4,12 +4,10 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 
-// Helper function to normalize date to midnight IST for consistent day comparison
+// Helper function to normalize a date to midnight UTC for consistent day comparison
 function normalizeToDay(date = new Date()) {
-  const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC + 5:30 in milliseconds
-  const istDate = new Date(date.getTime() + istOffset);
-  const dayString = istDate.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-  const dayDate = new Date(dayString + 'T00:00:00.000+05:30');
+  const dayString = date.toISOString().split('T')[0]; // 'YYYY-MM-DD' in UTC
+  const dayDate = new Date(dayString + 'T00:00:00.000Z'); // Z denotes UTC
   return { dayString, dayDate };
 }
 

@@ -38,13 +38,13 @@ function HomePage() {
 
   const extractTodayAttendance = (attendanceList) => {
     const today = new Date();
+    const todayUTCString = today.toISOString().split('T')[0];
+    
     return attendanceList.find((entry) => {
+      if (!entry.date) return false;
       const entryDate = new Date(entry.date);
-      return (
-        entryDate.getDate() === today.getDate() &&
-        entryDate.getMonth() === today.getMonth() &&
-        entryDate.getFullYear() === today.getFullYear()
-      );
+      const entryDateUTCString = entryDate.toISOString().split('T')[0];
+      return entryDateUTCString === todayUTCString;
     });
   };
 
