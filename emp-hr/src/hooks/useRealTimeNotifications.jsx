@@ -29,20 +29,29 @@ const useRealTimeNotifications = () => {
     }
   };
 
-  // Real-time notification listener
+  // ✅ FIXED: Real-time notification listener with duplicate prevention
   useEffect(() => {
     if (!socket || !user || !isConnected) return;
+
+    console.log('🔧 Setting up notification listener for user:', user._id);
 
     const handleNewNotification = (notification) => {
       console.log('🔔 New notification received:', notification);
       
-      // Add to notifications list
-      setNotifications(prev => [notification, ...prev]);
+      // Add to notifications list (prevent duplicates)
+      setNotifications(prev => {
+        const exists = prev.some(n => n._id === notification._id);
+        if (exists) {
+          console.log('🔧 Duplicate notification detected, skipping');
+          return prev;
+        }
+        return [notification, ...prev];
+      });
       
       // Update unread count
       setUnreadCount(prev => prev + 1);
 
-      // Show toast notification
+      // ✅ FIXED: Show toast with unique ID to prevent duplicates
       const getToastIcon = (type) => {
         switch (type) {
           case 'approval': return '✅';
@@ -61,6 +70,7 @@ const useRealTimeNotifications = () => {
           <p className="text-sm mt-1">{notification.message.substring(0, 100)}...</p>
         </div>,
         {
+          toastId: notification._id, // ✅ CRITICAL: Prevent duplicate toasts
           position: "top-right",
           autoClose: 5000,
           hideProgressBar: false,
@@ -71,12 +81,15 @@ const useRealTimeNotifications = () => {
       );
     };
 
+    // ✅ FIXED: Single listener registration with proper cleanup
     socket.on('new_notification', handleNewNotification);
+    console.log('✅ Notification listener registered');
 
     return () => {
+      console.log('🔧 Cleaning up notification listener');
       socket.off('new_notification', handleNewNotification);
     };
-  }, [socket, user, isConnected]);
+  }, [socket, user, isConnected]); // Only re-run when these dependencies change
 
   const markAsRead = async (notificationId) => {
     try {

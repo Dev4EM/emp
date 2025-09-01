@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Base URL for all API requests
 const API = axios.create({
-  // baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
-  baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
+  baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
+  // baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
   headers: {
     'Content-Type': 'application/json',
   },
