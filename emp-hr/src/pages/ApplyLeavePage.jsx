@@ -10,6 +10,8 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import NotificationsIcon from '@mui/icons-material/Notifications'; // 👈 ADD THIS IMPORT
+
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { format, isSameDay, isWeekend, isPast } from 'date-fns';
@@ -84,7 +86,7 @@ function ApplyLeavePage() {
       toast.error('Please select at least one date for leave.');
       return false;
     }
-    
+
     if (!reason.trim()) {
       toast.error('Please provide a reason for your leave.');
       return false;
@@ -101,55 +103,56 @@ function ApplyLeavePage() {
 
   const handleApplyClick = (e) => {
     e.preventDefault();
-    
+
     if (!validateLeaveApplication()) {
       return;
     }
-    
+
     setIsModalOpen(true);
   };
 
   const handleConfirmLeave = async () => {
-    setIsModalOpen(false);
-    setIsLoading(true);
-    
-    try {
-      // Apply leave for each selected date
-      const leaveApplications = selectedDates.map(date => {
-        const dateString = format(date, 'yyyy-MM-dd');
-        const details = dateDetails[dateString];
-        return {
-          leaveDate: dateString,
-          leaveType,
-          leaveDuration: details.duration,
-          leaveHalf: details.half,
-          reason
-        };
-      });
+  setIsModalOpen(false);
+  setIsLoading(true);
+  
+  try {
+    // Apply leave for each selected date
+    const leaveApplications = selectedDates.map(date => {
+      const dateString = format(date, 'yyyy-MM-dd');
+      const details = dateDetails[dateString];
+      return {
+        leaveDate: dateString,
+        leaveType,
+        leaveDuration: details.duration,
+        leaveHalf: details.half,
+        reason
+      };
+    });
 
-      // Apply leaves sequentially
-      for (const application of leaveApplications) {
-        await applyLeave(application);
-      }
-      
-      toast.success(`Successfully applied for leave on ${selectedDates.length} day(s)!`);
-      
-      // Reset form
-      setSelectedDates([]);
-      setDateDetails({});
-      setLeaveType('paid');
-      setReason('');
-      
-      // Refresh leave balance
-      const updatedBalance = await getLeaveBalance();
-      setLeaveBalance(updatedBalance);
-      
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to apply for leave.');
-    } finally {
-      setIsLoading(false);
+    // Apply leaves sequentially
+    for (const application of leaveApplications) {
+      await applyLeave(application);
     }
-  };
+    
+    toast.success(`Successfully applied for leave on ${selectedDates.length} day(s)! Notifications sent to you and your manager.`);
+
+    // Reset form
+    setSelectedDates([]);
+    setDateDetails({});
+    setLeaveType('paid');
+    setReason('');
+    
+    // Refresh leave balance
+    const updatedBalance = await getLeaveBalance();
+    setLeaveBalance(updatedBalance);
+    
+  } catch (err) {
+    toast.error(err.message || 'Failed to apply for leave.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const isDateDisabled = (date) => {
     return isPast(date) && !isSameDay(date, new Date());
@@ -165,48 +168,69 @@ function ApplyLeavePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
       <ToastContainer theme="dark" position="top-right" />
+
+     <Modal 
+  isOpen={isModalOpen} 
+  onClose={() => setIsModalOpen(false)} 
+  onConfirm={handleConfirmLeave}  // ✅ Use handleConfirmLeave instead
+  title="Confirm Leave Application"
+>
+  <div className="space-y-6">
+    <div className="bg-gray-800 p-6 rounded-xl border border-gray-600">
+      <h4 className="text-lg font-semibold mb-4 text-emerald-400">Leave Application Summary</h4>
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-400">Selected Dates:</span>
+          <span className="font-medium">{selectedDates.length} day(s)</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Leave Type:</span>
+          <span className="font-medium capitalize">{leaveType}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Total Days:</span>
+          <span className="font-bold text-emerald-400">{getTotalLeaveDays()} day(s)</span>
+        </div>
+      </div>
       
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onConfirm={handleConfirmLeave} 
-        title="Confirm Leave Application"
-      >
-        <div className="space-y-6">
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-600">
-            <h4 className="text-lg font-semibold mb-4 text-emerald-400">Leave Application Summary</h4>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Selected Dates:</span>
-                <span className="font-medium">{selectedDates.length} day(s)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Leave Type:</span>
-                <span className="font-medium capitalize">{leaveType}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total Days:</span>
-                <span className="font-bold text-emerald-400">{getTotalLeaveDays()} day(s)</span>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-gray-700 rounded-lg">
-              <p className="text-xs text-gray-300 mb-2">Dates:</p>
-              <p className="text-sm">{formatSelectedDates()}</p>
-            </div>
-            
-            <div className="mt-4 p-3 bg-gray-700 rounded-lg">
-              <p className="text-xs text-gray-300 mb-2">Reason:</p>
-              <p className="text-sm">{reason}</p>
-            </div>
-          </div>
-          
-          <div className="text-center">
-            <p className="text-gray-300">Are you sure you want to submit this leave application?</p>
+      <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+        <p className="text-xs text-gray-300 mb-2">Dates:</p>
+        <p className="text-sm">{formatSelectedDates()}</p>
+      </div>
+      
+      <div className="mt-4 p-3 bg-gray-700 rounded-lg">
+        <p className="text-xs text-gray-300 mb-2">Reason:</p>
+        <p className="text-sm">{reason}</p>
+      </div>
+    </div>
+
+    {/* ✅ ADD THE NOTIFICATION INFO HERE */}
+    <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl">
+      <div className="flex items-start space-x-3">
+        <NotificationsIcon className="text-blue-400 mt-1" />
+        <div>
+          <p className="text-sm font-medium text-blue-200 mb-2">
+            📧 Automatic Notifications
+          </p>
+          <div className="text-xs text-blue-300 space-y-1">
+            <p>• You will receive a confirmation notification</p>
+            <p>• Your reporting manager will be notified for approval</p>
+            <p>• You'll get notified when your leave is approved/rejected</p>
+            {getTotalLeaveDays() > 3 && (
+              <p>• Extended leave alert will be sent to your manager</p>
+            )}
           </div>
         </div>
-      </Modal>
+      </div>
+    </div>
+    
+    <div className="text-center">
+      <p className="text-gray-300">Are you sure you want to submit this leave application?</p>
+    </div>
+  </div>
+</Modal>
+
+
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -221,10 +245,10 @@ function ApplyLeavePage() {
 
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            
+
             {/* Left Column - Calendar */}
             <div className="xl:col-span-2 space-y-8">
-              
+
               {/* Calendar Section */}
               <div className="bg-gray-800/50 backdrop-blur-lg p-8 rounded-2xl border border-gray-700/50 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
@@ -234,7 +258,7 @@ function ApplyLeavePage() {
                     </div>
                     <h2 className="text-2xl font-bold">Select Leave Dates</h2>
                   </div>
-                  
+
                   {selectedDates.length > 0 && (
                     <button
                       onClick={clearAllDates}
@@ -336,7 +360,7 @@ function ApplyLeavePage() {
                       border: 2px solid #3b82f6;
                     }
                   `}</style>
-                  
+
                   <DayPicker
                     mode="multiple"
                     selected={selectedDates}
@@ -363,7 +387,7 @@ function ApplyLeavePage() {
                     <CheckCircleIcon className="text-emerald-400 mr-2" />
                     Selected Dates ({selectedDates.length})
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {selectedDates.sort((a, b) => a - b).map((date, index) => {
                       const dateString = format(date, 'yyyy-MM-dd');
@@ -421,7 +445,7 @@ function ApplyLeavePage() {
 
             {/* Right Column - Form & Balance */}
             <div className="space-y-8">
-              
+
               {/* Leave Balance */}
               <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50 shadow-2xl">
                 <div className="flex items-center space-x-3 mb-6">
@@ -430,7 +454,7 @@ function ApplyLeavePage() {
                   </div>
                   <h2 className="text-xl font-bold">Leave Balance</h2>
                 </div>
-                
+
                 {balanceLoading ? (
                   <div className="animate-pulse space-y-4">
                     <div className="h-16 bg-gray-700/50 rounded-lg"></div>
@@ -449,7 +473,7 @@ function ApplyLeavePage() {
                         <p className="text-sm text-gray-400">Remaining Paid Leave</p>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-gray-700/50 p-4 rounded-xl text-center">
                         <p className="text-2xl font-bold text-blue-400">{leaveBalance.paidLeavesTaken}</p>
@@ -469,7 +493,7 @@ function ApplyLeavePage() {
               {/* Application Form */}
               <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50 shadow-2xl">
                 <form onSubmit={handleApplyClick} className="space-y-6">
-                  
+
                   {/* Leave Details */}
                   <div className="space-y-4">
                     <div>
@@ -477,8 +501,8 @@ function ApplyLeavePage() {
                         <AccountBalanceWalletIcon className="w-4 h-4 text-emerald-400" />
                         <span>Leave Type</span>
                       </label>
-                      <select 
-                        value={leaveType} 
+                      <select
+                        value={leaveType}
                         onChange={(e) => setLeaveType(e.target.value)}
                         className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                       >
@@ -487,7 +511,7 @@ function ApplyLeavePage() {
                       </select>
                     </div>
 
-                    
+
                   </div>
 
                   {/* Reason */}
@@ -524,8 +548,8 @@ function ApplyLeavePage() {
                   )}
 
                   {/* Submit Button */}
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={isLoading || selectedDates.length === 0}
                     className="w-full py-4 font-bold text-lg bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2"
                   >

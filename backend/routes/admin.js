@@ -3,6 +3,42 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const json2csv = require('json2csv').parse;
+// Helper function to format datetime
+// Helper functions for date formatting
+const formatDate = (isoString) => {
+  if (!isoString) return '';
+  
+  try {
+    const date = new Date(isoString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}-${month}-${year}`;
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return isoString;
+  }
+};
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return '';
+  
+  try {
+    const date = new Date(isoString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${day}-${month}-${year} ${hours}:${minutes}`;
+  } catch (error) {
+    console.error('DateTime formatting error:', error);
+    return isoString;
+  }
+};
+
 
 function calculateAttendanceStatus(checkIn, checkOut) {
   if (!checkIn || !checkOut) {
@@ -24,57 +60,86 @@ const checkAdmin = (req, res, next) => {
 };
 router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
   try {
-    const users = await User.find().select('attendance First name Last name');
-
+    // Get all user fields to ensure name fields are included
+    const users = await User.find({}, {
+      attendance: 1,
+      'First name': 1,
+      'Last name': 1,
+      firstName: 1,
+      lastName: 1
+    });
+    
     const records = [];
     users.forEach(user => {
-      user.attendance.forEach(a => {
-        const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
-        records.push({
-          Employee: `${user["First name"]} ${user["Last name"]}`,
-          Date: a.date.toISOString().split('T')[0],
-          'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
-          'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
-          'Total Hours': totalHours.toFixed(2),
-          Status: status
+      if (user.attendance && user.attendance.length > 0) {
+        user.attendance.forEach(a => {
+          const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+          
+          // Use multiple fallback options for name fields
+          const firstName = user['First name'] || user.firstName || 'Unknown';
+          const lastName = user['Last name'] || user.lastName || 'User';
+          
+          records.push({
+            Employee: `${firstName} ${lastName}`.trim(),
+            Date: a.date ? a.date.toISOString().split('T')[0] : '',
+            'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
+            'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
+            'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
+            Status: status || 'Unknown'
+          });
         });
-      });
+      }
     });
 
     const csv = json2csv(records);
     res.header('Content-Type', 'text/csv');
-    res.attachment(`all_employees_attendance.csv`);
+    res.attachment('all_employees_attendance.csv');
     return res.send(csv);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({message:'Server error'});
+    console.error('CSV generation error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 router.get('/attendance/:employeeId/csv', auth, checkAdmin, async (req, res) => {
   try {
-    const user = await User.findById(req.params.employeeId);
-    if(!user) return res.status(404).json({message: "User not found"});
+    const employeeId = req.params.employeeId;
+    
+    // ✅ FIX: Use findById to get the specific user, not find({}) which gets all users
+    const user = await User.findById(employeeId).select('attendance "First name" "Last name" firstName lastName');
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.attendance || user.attendance.length === 0) {
+      return res.status(404).json({ message: "No attendance records found for this user" });
+    }
+
+    // Handle name fields with fallbacks 
+    const employeeName = `${firstName} ${lastName}`.trim();
 
     const records = user.attendance.map(a => {
       const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
       return {
-        Date: a.date.toISOString().split('T')[0],
-        'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
-        'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
-        'Total Hours': totalHours.toFixed(2),
-        Status: status
+         Date: formatDate(a.date), // Format: 24-08-2025
+        'Check-in': formatDateTime(a.checkIn), // Format: 24-08-2025 11:36
+        'Check-out': formatDateTime(a.checkOut), // Format: 24-08-2025 16:45
+        'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
+        Status: status || 'Unknown'
       };
     });
 
     const csv = json2csv(records);
     res.header('Content-Type', 'text/csv');
-    res.attachment(`${user["First name"]}_attendance.csv`);
+    res.attachment(`${employeeName.replace(/\s+/g, '_')}_attendance.csv`);
     return res.send(csv);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({message:'Server error'});
+    console.error('CSV generation error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

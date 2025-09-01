@@ -2,30 +2,122 @@ import axios from 'axios';
 
 // Base URL for all API requests
 const API = axios.create({
-  baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
+  baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
+  // baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Optional: Add auth token to every request (if needed)
+// Add auth token to every request
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token'); // 🔐 get token from localStorage
+  const token = localStorage.getItem('token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`; // ✅ attach token
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
-// ----------------- API FUNCTIONS ------------------
-// Download all employees' attendance CSV
-export const downloadAllAttendanceCSV = () => {
-  // This returns a full URL that can be used in an <a> tag or window.open()
-  return `${API.defaults.baseURL}/admin/attendance/all/csv`;
+
+// Global error handler
+const handleApiRequest = async (apiCall) => {
+  try {
+    const response = await apiCall();
+    return response.data;
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        'An unexpected error occurred';
+    
+    console.error('API Error:', errorMessage);
+    throw new Error(errorMessage);
+  }
 };
 
-// Download individual employee attendance CSV by userId
-export const downloadEmployeeAttendanceCSV = (userId) => {
-  return `${API.defaults.baseURL}/admin/attendance/${userId}/csv`;
+// Notification APIs
+export const createNotification = async (notificationData) => {
+  return handleApiRequest(() => API.post('/notifications', notificationData));
+};
+
+export const getUserNotifications = async (userId) => {
+  return handleApiRequest(() => API.get(`/notifications/user/${userId}`));
+};
+
+export const markNotificationAsRead = async (notificationId) => {
+  return handleApiRequest(() => API.put(`/notifications/${notificationId}/read`));
+};
+
+export const deleteNotification = async (notificationId) => {
+  return handleApiRequest(() => API.delete(`/notifications/${notificationId}`));
+};
+
+// ----------------- API FUNCTIONS ------------------
+// Replace the URL return functions with actual API calls
+export const downloadAllAttendanceCSV = async () => {
+  try {
+    const response = await API.get('/admin/attendance/all/csv', {
+      responseType: 'blob', // Important for file downloads
+      headers: {
+        'Accept': 'text/csv'
+      }
+    });
+    
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'all_employees_attendance.csv';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Download error:', error);
+    throw new Error('Failed to download attendance CSV');
+  }
+};
+
+// Replace the URL return function with actual API call
+export const downloadEmployeeAttendanceCSV = async (employeeId) => {
+  try {
+    const response = await API.get(`/admin/attendance/${employeeId}/csv`, {
+      responseType: 'blob', // Important for file downloads
+      headers: {
+        'Accept': 'text/csv'
+      }
+    });
+    
+    // Extract filename from response headers if available
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = `employee_attendance.csv`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[18];
+      }
+    }
+    
+    // Create blob and trigger download
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Download error:', error);
+    throw new Error('Failed to download employee attendance CSV');
+  }
 };
 
 // Auth APIs

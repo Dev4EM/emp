@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import Layout from './components/Layout';
 import ApplyLeavePage from './pages/ApplyLeavePage';
 import LoginPage from './pages/LoginPage';
+import { SocketProvider } from './hooks/useSocket.jsx';
 import AuthWrapper from './components/AuthWrapper';
 import TeamMembersPage from './pages/TeamMembersPage';
 import PendingLeavesPage from './pages/PendingLeavesPage';
@@ -32,6 +33,8 @@ const AppContent = () => {
           <Route path="/login" element={<LoginPage />} />
         </Routes>
       ) : (
+                <SocketProvider>
+
         <Layout>
           <Routes>
             <Route element={<AuthWrapper />}>
@@ -53,6 +56,8 @@ const AppContent = () => {
 
           </Routes>
         </Layout>
+                </SocketProvider>
+
       )}
     </>
   );

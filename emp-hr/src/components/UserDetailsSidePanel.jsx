@@ -12,18 +12,20 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BadgeIcon from '@mui/icons-material/Badge';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
- import { downloadEmployeeAttendanceCSV } from '../components/Api';
-
+import { downloadEmployeeAttendanceCSV } from '../components/Api';
+import DownloadIcon from '@mui/icons-material/Download';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import WeekendIcon from '@mui/icons-material/Weekend';
 import { format, isSameDay, isWeekend, parseISO, differenceInHours, differenceInMinutes } from 'date-fns';
+import { toast } from 'react-toastify';
 
 function UserDetailsSidePanel({ user, isOpen, onClose }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [attendanceForSelectedDate, setAttendanceForSelectedDate] = useState(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   useEffect(() => {
     const handleEscape = (event) => {
@@ -56,6 +58,51 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
 
   if (!isOpen || !user) return null;
 
+  // 📅 Updated format functions for dd-mm-yyyy hh:mm format
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return dateString;
+    }
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return 'N/A';
+    try {
+      const date = new Date(timeString);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    } catch (error) {
+      console.error('Time formatting error:', error);
+      return timeString;
+    }
+  };
+
+  // Format with both date and time for display
+  const formatDateTime = (dateTimeString) => {
+    if (!dateTimeString) return 'N/A';
+    try {
+      const date = new Date(dateTimeString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}-${month}-${year} ${hours}:${minutes}`;
+    } catch (error) {
+      console.error('DateTime formatting error:', error);
+      return dateTimeString;
+    }
+  };
+
   const getUserTypeIcon = (userType) => {
     switch (userType) {
       case 'admin':
@@ -76,20 +123,6 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
     return colors[userType] || colors.employee;
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const formatTime = (timeString) => {
-    if (!timeString) return 'N/A';
-    return format(new Date(timeString), 'hh:mm aa');
-  };
-
   const calculateWorkHours = (checkIn, checkOut) => {
     if (!checkIn || !checkOut) return 'N/A';
     
@@ -101,6 +134,26 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
     
     return `${hours}h ${minutes}m`;
   };
+
+  // Handle CSV download
+ // Update the handleDownloadCSV function
+const handleDownloadCSV = async () => {
+  try {
+    setDownloadLoading(true);
+    toast.info(`Preparing ${user['First name']}'s attendance CSV...`);
+    
+    // Call the API function directly (don't use window.open)
+    await downloadEmployeeAttendanceCSV(user._id);
+    
+    toast.success(`${user['First name']}'s attendance CSV downloaded successfully!`);
+  } catch (error) {
+    console.error('Download failed:', error);
+    toast.error(error.message || 'Failed to download CSV');
+  } finally {
+    setDownloadLoading(false);
+  }
+};
+
 
   // Get attendance dates for calendar modifiers
   const getAttendanceDates = () => {
@@ -149,14 +202,28 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-900/50">
             <h2 className="text-2xl font-bold text-white">Employee Details</h2>
-            <button 
-              onClick={onClose}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <CloseIcon className="text-gray-400 hover:text-white" />
-            </button>
-            {/* Download Attendance CSV Button */}
- 
+            <div className="flex items-center gap-3">
+              {/* Download Button */}
+              <button
+                onClick={handleDownloadCSV}
+                disabled={downloadLoading}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                  downloadLoading 
+                    ? 'bg-gray-600 cursor-not-allowed text-gray-300' 
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                <DownloadIcon className="w-4 h-4" />
+                {downloadLoading ? 'Downloading...' : 'Download CSV'}
+              </button>
+              
+              <button 
+                onClick={onClose}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <CloseIcon className="text-gray-400 hover:text-white" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}
@@ -185,17 +252,10 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
                   <p className="text-2xl font-bold text-blue-400">{user.attendance?.length || 0}</p>
                   <p className="text-xs text-gray-400">Attendance Days</p>
                 </div>
-                <div className="bg-blue-500/20 rounded-xl p-4 text-center">
-                             {/* Download Attendance CSV Button */}
-   <button
-    onClick={() => window.open(downloadEmployeeAttendanceCSV(user._id), '_blank')}
-    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded    space-x-2"
-  >
-     <span>Download Attendance</span>
-  </button>
- 
+                <div className="bg-purple-500/20 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-400">{user.leaves?.length || 0}</p>
+                  <p className="text-xs text-gray-400">Leave Requests</p>
                 </div>
-                
               </div>
 
               {/* Attendance Calendar */}
@@ -429,7 +489,7 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Recent Attendance Summary */}
+              {/* Recent Attendance Summary with Updated Formatting */}
               <div className="bg-gray-700/30 rounded-xl p-4">
                 <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
                   <AccessTimeIcon className="w-5 h-5 mr-2 text-yellow-400" />
@@ -441,7 +501,7 @@ function UserDetailsSidePanel({ user, isOpen, onClose }) {
                       <div>
                         <p className="text-sm font-medium text-white">{formatDate(att.date)}</p>
                         <p className="text-xs text-gray-400">
-                          {att.checkIn ? formatTime(att.checkIn) : 'No check-in'} - {att.checkOut ? formatTime(att.checkOut) : 'No check-out'}
+                          {att.checkIn ? `${formatTime(att.checkIn)}` : 'No check-in'} - {att.checkOut ? `${formatTime(att.checkOut)}` : 'No check-out'}
                         </p>
                       </div>
                       <div className="text-right">

@@ -173,7 +173,7 @@ function AdminDashboardPage() {
                 <FilterListIcon className="text-emerald-400" />
                 <h3 className="text-lg font-semibold">Filters & Search</h3>
               </div>
-              <Link to="/add-user" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded">
+              <Link to="/add-employee" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded">
                 Add User
               </Link>
 
@@ -217,12 +217,22 @@ function AdminDashboardPage() {
             </div>
           </div>
           <div className="mt-6 flex space-x-4">
-            <button
-              onClick={() => window.open(downloadAllAttendanceCSV(), '_blank')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-            >
-              Download All Attendance CSV
-            </button>
+           <button
+    onClick={async () => {
+      try {
+        toast.info('Preparing CSV download...');
+        await downloadAllAttendanceCSV();
+        toast.success('All attendance CSV downloaded successfully!');
+      } catch (error) {
+        console.error('Download failed:', error);
+        toast.error(error.message || 'Failed to download CSV');
+      }
+    }}
+    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 font-medium"
+  >
+     Download All Attendance CSV
+  </button>
+
 
             {selectedUser && (
               <button

@@ -10,6 +10,196 @@ const checkTeamLeader = (req, res, next) => {
   }
   next();
 };
+// In routes/teamleader.js
+
+const createLeaveDecisionNotifications = async (employee, leave, decision, managerName, rejectionReason = '', io) => {
+  try {
+    const employeeName = `${employee['First name']} ${employee['Last name']}`;
+    const leaveDate = new Date(leave.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric', 
+      month: 'long',
+      day: 'numeric'
+    });
+    const duration = leave.duration === 1 ? 'Full Day' : 'Half Day';
+
+    let notificationData = {
+      recipient: employee._id,
+      createdBy: employee._id, // Manager's ID would be better if available
+      type: decision === 'approved' ? 'approval' : 'update',
+      priority: decision === 'approved' ? 'normal' : 'high'
+    };
+
+    if (decision === 'approved') {
+      notificationData = {
+        ...notificationData,
+        title: '✅ Leave Request Approved!',
+        message: `Great news! Your ${leave.type} leave request for ${leaveDate} (${duration}) has been approved by ${managerName}. Your leave balance has been updated. Enjoy your time off!`
+      };
+    } else if (decision === 'rejected') {
+      notificationData = {
+        ...notificationData,
+        title: '❌ Leave Request Rejected',
+        message: `Your ${leave.type} leave request for ${leaveDate} (${duration}) has been rejected by ${managerName}.${rejectionReason ? ` Reason: ${rejectionReason}` : ''} Please contact your manager for more information.`
+      };
+    }
+
+    const notification = new Notification(notificationData);
+    await notification.save();
+    await notification.populate('createdBy', 'First name Last name');
+
+    // Emit to employee
+    if (io) {
+      io.to(employee._id.toString()).emit('new_notification', notification);
+      console.log(`📧 Leave ${decision} notification sent to ${employeeName}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`❌ Error creating leave ${decision} notification:`, error);
+    return false;
+  }
+};
+
+// PUT /api/teamleader/approve-leave - Updated with notifications
+router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
+  const { employeeId, leaveId } = req.body;
+
+  if (!employeeId || !leaveId) {
+    return res.status(400).json({ message: 'Employee ID and Leave ID are required' });
+  }
+
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    const employee = await User.findOne({ 
+      _id: employeeId, 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    });
+
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found or not under your management' });
+    }
+
+    const leave = employee.leaves.id(leaveId);
+    if (!leave) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ message: 'Leave request is not pending' });
+    }
+
+    // Check and update leave balance
+    if (leave.type === 'paid') {
+      if (employee.paidLeaveBalance < leave.duration) {
+        return res.status(400).json({ 
+          message: `Cannot approve. Employee has insufficient paid leave balance. Available: ${employee.paidLeaveBalance} days` 
+        });
+      }
+      employee.paidLeaveBalance -= leave.duration;
+    }
+
+    // Update leave status
+    leave.status = 'approved';
+    leave.approvedBy = req.user.id;
+    leave.approvedOn = new Date();
+
+    await employee.save();
+
+    // 🔔 SEND NOTIFICATION TO EMPLOYEE
+    const io = req.app.get('socketio');
+    await createLeaveDecisionNotifications(employee, leave, 'approved', managerName, '', io);
+
+    res.json({ 
+      message: 'Leave request approved successfully and employee has been notified',
+      leave: {
+        leaveId: leave._id,
+        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
+        employeeCode: employee["Employee Code"],
+        status: leave.status,
+        approvedOn: leave.approvedOn,
+        type: leave.type,
+        duration: leave.duration,
+        date: leave.date
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// PUT /api/teamleader/reject-leave - Updated with notifications
+router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
+  const { employeeId, leaveId, rejectionReason } = req.body;
+
+  if (!employeeId || !leaveId) {
+    return res.status(400).json({ message: 'Employee ID and Leave ID are required' });
+  }
+
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
+    
+    const employee = await User.findOne({ 
+      _id: employeeId, 
+      "Reporting manager": { 
+        $regex: new RegExp(`^${managerName}$`, 'i') 
+      } 
+    });
+
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found or not under your management' });
+    }
+
+    const leave = employee.leaves.id(leaveId);
+    if (!leave) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ message: 'Leave request is not pending' });
+    }
+
+    // Update leave status
+    leave.status = 'rejected';
+    leave.approvedBy = req.user.id;
+    leave.approvedOn = new Date();
+    if (rejectionReason) {
+      leave.rejectionReason = rejectionReason;
+    }
+
+    await employee.save();
+
+    // 🔔 SEND NOTIFICATION TO EMPLOYEE
+    const io = req.app.get('socketio');
+    await createLeaveDecisionNotifications(employee, leave, 'rejected', managerName, rejectionReason, io);
+
+    res.json({ 
+      message: 'Leave request rejected successfully and employee has been notified',
+      leave: {
+        leaveId: leave._id,
+        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
+        employeeCode: employee["Employee Code"],
+        status: leave.status,
+        rejectedOn: leave.approvedOn,
+        rejectionReason: rejectionReason,
+        type: leave.type,
+        duration: leave.duration,
+        date: leave.date
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
 
 // POST /api/teamleader/add-employee
 router.post('/add-employee', auth, checkTeamLeader, async (req, res) => {
@@ -97,138 +287,7 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// PUT /api/teamleader/approve-leave - Updated to work with reporting manager names
-router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
-  const { employeeId, leaveId } = req.body;
-
-  if (!employeeId || !leaveId) {
-    return res.status(400).json({ message: 'Employee ID and Leave ID are required' });
-  }
-
-  try {
-    // Get the current user's full name
-    const currentUser = await User.findById(req.user.id);
-    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
-    
-    // Find employee by ID and verify they report to current user
-    const employee = await User.findOne({ 
-      _id: employeeId, 
-      "Reporting manager": { 
-        $regex: new RegExp(`^${managerName}$`, 'i') 
-      } 
-    });
-
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found or not under your management' });
-    }
-
-    const leave = employee.leaves.id(leaveId);
-    if (!leave) {
-      return res.status(404).json({ message: 'Leave request not found' });
-    }
-
-    if (leave.status !== 'pending') {
-      return res.status(400).json({ message: 'Leave request is not pending' });
-    }
-
-    if (leave.type === 'paid') {
-      if (employee.paidLeaveBalance < leave.duration) {
-        return res.status(400).json({ 
-          message: `Cannot approve. Employee has insufficient paid leave balance. Available: ${employee.paidLeaveBalance} days` 
-        });
-      }
-      employee.paidLeaveBalance -= leave.duration;
-    }
-
-    leave.status = 'approved';
-    leave.approvedBy = req.user.id;
-    leave.approvedOn = new Date();
-
-    await employee.save();
-
-    res.json({ 
-      message: 'Leave request approved successfully',
-      leave: {
-        leaveId: leave._id,
-        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
-        employeeCode: employee["Employee Code"],
-        status: leave.status,
-        approvedOn: leave.approvedOn,
-        type: leave.type,
-        duration: leave.duration,
-        date: leave.date
-      }
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-});
-
-// PUT /api/teamleader/reject-leave - Updated to work with reporting manager names
-router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
-  const { employeeId, leaveId, rejectionReason } = req.body;
-
-  if (!employeeId || !leaveId) {
-    return res.status(400).json({ message: 'Employee ID and Leave ID are required' });
-  }
-
-  try {
-    // Get the current user's full name
-    const currentUser = await User.findById(req.user.id);
-    const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
-    
-    // Find employee by ID and verify they report to current user
-    const employee = await User.findOne({ 
-      _id: employeeId, 
-      "Reporting manager": { 
-        $regex: new RegExp(`^${managerName}$`, 'i') 
-      } 
-    });
-
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found or not under your management' });
-    }
-
-    const leave = employee.leaves.id(leaveId);
-    if (!leave) {
-      return res.status(404).json({ message: 'Leave request not found' });
-    }
-
-    if (leave.status !== 'pending') {
-      return res.status(400).json({ message: 'Leave request is not pending' });
-    }
-
-    leave.status = 'rejected';
-    leave.approvedBy = req.user.id;
-    leave.approvedOn = new Date();
-    if (rejectionReason) {
-      leave.rejectionReason = rejectionReason;
-    }
-
-    await employee.save();
-
-    res.json({ 
-      message: 'Leave request rejected successfully',
-      leave: {
-        leaveId: leave._id,
-        employeeName: `${employee["First name"]} ${employee["Last name"]}`,
-        employeeCode: employee["Employee Code"],
-        status: leave.status,
-        rejectedOn: leave.approvedOn,
-        rejectionReason: rejectionReason,
-        type: leave.type,
-        duration: leave.duration,
-        date: leave.date
-      }
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
-  }
-});
+ 
 
 // GET /api/teamleader/team-attendance - New endpoint to get team attendance
 router.get('/team-attendance', auth, checkTeamLeader, async (req, res) => {
