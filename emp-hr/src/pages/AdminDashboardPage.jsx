@@ -52,6 +52,11 @@ function AdminDashboardPage() {
     setSelectedUser(null);
   };
 
+  const handleUserUpdate = (updatedUser) => {
+    setUsers(users.map(user => user._id === updatedUser._id ? updatedUser : user));
+    setSelectedUser(updatedUser);
+  };
+
   const departments = ['All', ...new Set(users.map(user => user.Department || user.department).filter(Boolean))];
   const userTypes = ['All', 'admin', 'teamleader', 'employee'];
 
@@ -306,6 +311,7 @@ function AdminDashboardPage() {
         user={selectedUser}
         isOpen={!!selectedUser}
         onClose={handleCloseSidePanel}
+        onUserUpdate={handleUserUpdate}
       />
     </div>
   );

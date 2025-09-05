@@ -185,7 +185,7 @@ if (employee['Reporting manager']) {
   } else {
     console.warn(`⚠️ Reporting manager "${employee['Reporting manager']}" not found for employee ${employeeName}`);
     console.log('🔧 DEBUG: Available managers in database:');
-    
+  
     // Debug: Show available managers
     const allManagers = await User.find({ 
       userType: { $in: ['admin', 'teamleader'] } 

@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Base URL for all API requests
 const API = axios.create({
-  // baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
-  baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
+  baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
+  // baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
   headers: {
     'Content-Type': 'application/json',
   },
@@ -247,6 +247,14 @@ export const rejectLeave = async (employeeId, leaveId, rejectionReason) => {
 export const getAllUsers = async () => {
   const response = await API.get('/admin/all-users');
   return response.data;
+};
+
+export const updateAttendance = async (userId, date, attendanceData) => {
+  return handleApiRequest(() => API.put(`/admin/attendance/${userId}`, { date, ...attendanceData }));
+};
+
+export const updateLeaveBalance = async (userId, leaveBalance) => {
+  return handleApiRequest(() => API.put(`/admin/leave-balance/${userId}`, { leaveBalance }));
 };
 export const assignReportingManager = async (data) => {
   const response = await API.put('/admin/assign-reporting-manager', data);

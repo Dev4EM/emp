@@ -2,7 +2,15 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { default: mongoose } = require('mongoose');
 const json2csv = require('json2csv').parse;
+
+function normalizeToDay(date = new Date()) {
+  const dayString = date.toISOString().split('T')[0]; // 'YYYY-MM-DD' in UTC
+  const dayDate = new Date(dayString + 'T00:00:00.000Z'); // Z denotes UTC
+  return { dayString, dayDate };
+}
+
 // Helper function to format datetime
 // Helper functions for date formatting
 const formatDate = (isoString) => {
@@ -517,6 +525,91 @@ router.get('/dashboard-stats', auth, checkAdmin, async (req, res) => {
       message: 'Server Error',
       error: error.message 
     });
+  }
+});
+
+// ROUTE: PUT /api/admin/attendance/:userId
+// DESC: Update attendance for a specific user
+router.put('/attendance/:userId', auth, checkAdmin, async (req, res) => {
+  const { userId } = req.params;
+  const { date, checkIn, checkOut } = req.body;
+
+  try {
+    const dayString = new Date(date).toISOString().split('T')[0];
+    const attendanceId = '68b919818e4b49edfa0d26bb'; // Get this from request
+
+    const updateFields = {};
+    if (checkIn && checkIn.trim() !== '') {
+      updateFields['attendance.$.checkIn'] = new Date(`${dayString}T${checkIn}:00.000Z`);
+    }
+    if (checkOut && checkOut.trim() !== '') {
+      updateFields['attendance.$.checkOut'] = new Date(`${dayString}T${checkOut}:00.000Z`);
+    } else if (checkOut === '') {
+      updateFields['attendance.$.checkOut'] = null;
+    }
+
+    // ✅ Direct MongoDB update with proper query
+    const result = await User.updateOne(
+      { 
+        _id: userId, 
+        'attendance._id': new mongoose.Types.ObjectId(attendanceId)
+      },
+      { 
+        $set: updateFields,
+        $inc: { __v: 1 } // Increment version manually
+      }
+    );
+
+    console.log('Update result:', result);
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Attendance record not found' });
+    }
+
+    // Get updated record
+    const user = await User.findById(userId);
+    const updatedRecord = user.attendance.id(attendanceId);
+
+    res.json({
+      success: true,
+      message: 'Attendance updated successfully',
+      attendance: updatedRecord,
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+router.put('/leave-balance/:userId', auth, checkAdmin, async (req, res) => {
+  const { userId } = req.params;
+  const { leaveBalance } = req.body;
+
+  if (leaveBalance === undefined) {
+    return res.status(400).json({ message: 'Leave balance is required' });
+  }
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: { paidLeaveBalance: leaveBalance } },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Leave balance updated successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Error updating leave balance:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

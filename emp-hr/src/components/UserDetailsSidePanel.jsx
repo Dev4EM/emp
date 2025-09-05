@@ -21,11 +21,15 @@ import EventBusyIcon from '@mui/icons-material/EventBusy';
 import WeekendIcon from '@mui/icons-material/Weekend';
 import { format, isSameDay, isWeekend, parseISO, differenceInHours, differenceInMinutes } from 'date-fns';
 import { toast } from 'react-toastify';
+import AttendanceModal from './AttendanceModal';
+import LeaveBalanceModal from './LeaveBalanceModal';
 
-function UserDetailsSidePanel({ user, isOpen, onClose }) {
+function UserDetailsSidePanel({ user, isOpen, onClose, onUserUpdate }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [attendanceForSelectedDate, setAttendanceForSelectedDate] = useState(null);
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLeaveBalanceModalOpen, setIsLeaveBalanceModalOpen] = useState(false);
 
   useEffect(() => {
     const handleEscape = (event) => {
@@ -182,6 +186,16 @@ const handleDownloadCSV = async () => {
     setSelectedDate(date);
   };
 
+  const openLeaveBalanceModal = () => {
+    setIsLeaveBalanceModalOpen(true);
+  };
+
+  const closeLeaveBalanceModal = () => {
+    setIsLeaveBalanceModalOpen(false);
+  };
+
+  
+
   return (
     <>
       {/* Backdrop */}
@@ -245,7 +259,14 @@ const handleDownloadCSV = async () => {
               {/* Quick Stats Grid */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-emerald-500/20 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-400">{user.paidLeaveBalance || 0}</p>
+                  <div className="flex items-center justify-center space-x-2">
+                    <p className="text-2xl font-bold text-emerald-400">{user.paidLeaveBalance || 0}</p>
+                    <button onClick={openLeaveBalanceModal} className="text-emerald-400 hover:text-emerald-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-400">Leave Balance</p>
                 </div>
                 <div className="bg-blue-500/20 rounded-xl p-4 text-center">
@@ -376,10 +397,18 @@ const handleDownloadCSV = async () => {
               {/* Selected Date Details */}
               {selectedDate && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                  <h4 className="text-lg font-semibold text-white mb-3 flex items-center">
-                    <EventAvailableIcon className="w-5 h-5 mr-2 text-blue-400" />
-                    {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                    {isWeekend(selectedDate) && <WeekendIcon className="w-4 h-4 ml-2 text-yellow-400" />}
+                  <h4 className="text-lg font-semibold text-white mb-3 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <EventAvailableIcon className="w-5 h-5 mr-2 text-blue-400" />
+                      {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                      {isWeekend(selectedDate) && <WeekendIcon className="w-4 h-4 ml-2 text-yellow-400" />}
+                    </div>
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm"
+                    >
+                      Edit
+                    </button>
                   </h4>
                   
                   {attendanceForSelectedDate ? (
@@ -519,6 +548,22 @@ const handleDownloadCSV = async () => {
           </div>
         </div>
       </div>
+      {isModalOpen && (
+        <AttendanceModal
+          user={user}
+          date={selectedDate}
+          attendance={attendanceForSelectedDate}
+          onClose={() => setIsModalOpen(false)}
+          onUserUpdate={onUserUpdate}
+        />
+      )}
+      {isLeaveBalanceModalOpen && (
+        <LeaveBalanceModal
+          user={user}
+          onClose={closeLeaveBalanceModal}
+          onUserUpdate={onUserUpdate}
+        />
+      )}
     </>
   );
 }
