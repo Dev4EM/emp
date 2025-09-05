@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const Attendance = require('../models/Attendance'); // Add this import
+const Notification = require('../models/Notification'); // Add this import
 
 // Middleware to check if user is a team leader or admin
 const checkTeamLeader = (req, res, next) => {
@@ -10,8 +12,8 @@ const checkTeamLeader = (req, res, next) => {
   }
   next();
 };
-// In routes/teamleader.js
 
+// Enhanced notification function for leave decisions
 const createLeaveDecisionNotifications = async (employee, leave, decision, managerName, rejectionReason = '', io) => {
   try {
     const employeeName = `${employee['First name']} ${employee['Last name']}`;
@@ -25,7 +27,7 @@ const createLeaveDecisionNotifications = async (employee, leave, decision, manag
 
     let notificationData = {
       recipient: employee._id,
-      createdBy: employee._id, // Manager's ID would be better if available
+      createdBy: employee._id, // This could be manager's ID if available
       type: decision === 'approved' ? 'approval' : 'update',
       priority: decision === 'approved' ? 'normal' : 'high'
     };
@@ -61,7 +63,7 @@ const createLeaveDecisionNotifications = async (employee, leave, decision, manag
   }
 };
 
-// PUT /api/teamleader/approve-leave - Updated with notifications
+// ✅ Fixed: Approve leave with consistent user ID
 router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId } = req.body;
 
@@ -70,7 +72,8 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
     
     const employee = await User.findOne({ 
@@ -105,16 +108,17 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
 
     // Update leave status
     leave.status = 'approved';
-    leave.approvedBy = req.user.id;
+    leave.approvedBy = req.user._id; // ✅ Fixed: Use _id
     leave.approvedOn = new Date();
 
     await employee.save();
 
-    // 🔔 SEND NOTIFICATION TO EMPLOYEE
+    // Send notification to employee
     const io = req.app.get('socketio');
     await createLeaveDecisionNotifications(employee, leave, 'approved', managerName, '', io);
 
     res.json({ 
+      success: true,
       message: 'Leave request approved successfully and employee has been notified',
       leave: {
         leaveId: leave._id,
@@ -129,12 +133,12 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('Error approving leave:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// PUT /api/teamleader/reject-leave - Updated with notifications
+// ✅ Fixed: Reject leave with consistent user ID
 router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId, rejectionReason } = req.body;
 
@@ -143,7 +147,8 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   }
 
   try {
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
     
     const employee = await User.findOne({ 
@@ -168,7 +173,7 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
 
     // Update leave status
     leave.status = 'rejected';
-    leave.approvedBy = req.user.id;
+    leave.approvedBy = req.user._id; // ✅ Fixed: Use _id
     leave.approvedOn = new Date();
     if (rejectionReason) {
       leave.rejectionReason = rejectionReason;
@@ -176,11 +181,12 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
 
     await employee.save();
 
-    // 🔔 SEND NOTIFICATION TO EMPLOYEE
+    // Send notification to employee
     const io = req.app.get('socketio');
     await createLeaveDecisionNotifications(employee, leave, 'rejected', managerName, rejectionReason, io);
 
     res.json({ 
+      success: true,
       message: 'Leave request rejected successfully and employee has been notified',
       leave: {
         leaveId: leave._id,
@@ -196,60 +202,66 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('Error rejecting leave:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// POST /api/teamleader/add-employee
+// ✅ Fixed: Add employee with consistent user ID
 router.post('/add-employee', auth, checkTeamLeader, async (req, res) => {
-    const { "Work email": workEmail } = req.body;
-    try {
-        let user = await User.findOne({ "Work email": workEmail });
-        if (user) {
-            return res.status(400).json({ message: 'User with this email already exists' });
-        }
-
-        const newEmployee = new User(req.body);
-        await newEmployee.save();
-
-        res.status(201).json({ message: 'Employee added successfully', user: newEmployee });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+  const { "Work email": workEmail } = req.body;
+  
+  try {
+    let user = await User.findOne({ "Work email": workEmail });
+    if (user) {
+      return res.status(400).json({ message: 'User with this email already exists' });
     }
+
+    const newEmployee = new User(req.body);
+    await newEmployee.save();
+
+    res.status(201).json({ 
+      success: true,
+      message: 'Employee added successfully', 
+      user: newEmployee 
+    });
+
+  } catch (error) {
+    console.error('Error adding employee:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
 });
 
-// GET /api/teamleader/team-members - Updated to find by reporting manager name
+// ✅ Fixed: Get team members with consistent user ID
 router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
   try {
-    // Get the current user's full name to match against reporting manager field
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
     
-    // Find all users whose "Reporting manager" field matches the current user's name (case-insensitive)
     const teamMembers = await User.find({ 
       "Reporting manager": { 
         $regex: new RegExp(`^${managerName}$`, 'i') 
       } 
     }).select('-password');
     
-    res.json(teamMembers);
+    res.json({
+      success: true,
+      teamMembers: teamMembers
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching team members:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// GET /api/teamleader/pending-leaves - Updated to work with reporting manager names
+// ✅ Fixed: Get pending leaves with consistent user ID
 router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   try {
-    // Get the current user's full name
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
     
-    // Find team members by reporting manager name
     const teamMembers = await User.find({ 
       "Reporting manager": { 
         $regex: new RegExp(`^${managerName}$`, 'i') 
@@ -280,39 +292,63 @@ router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
     // Sort by applied date (newest first)
     pendingLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
     
-    res.json(pendingLeaves);
+    res.json({
+      success: true,
+      pendingLeaves: pendingLeaves
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching pending leaves:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
- 
-
-// GET /api/teamleader/team-attendance - New endpoint to get team attendance
+// ✅ Updated: Team attendance using new Attendance collection
 router.get('/team-attendance', auth, checkTeamLeader, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
     
     const teamMembers = await User.find({ 
       "Reporting manager": { 
         $regex: new RegExp(`^${managerName}$`, 'i') 
       } 
-    }).select('["First name"] ["Last name"] ["Employee Code"] attendance');
+    }).select('First\ name Last\ name Employee\ Code');
     
-    res.json(teamMembers);
+    // ✅ Get attendance from new collection
+    const teamMemberIds = teamMembers.map(member => member._id);
+    
+    const { month, year } = req.query;
+    let dateQuery = {};
+    
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      dateQuery = { date: { $gte: startDate, $lte: endDate } };
+    }
+    
+    const attendanceRecords = await Attendance.find({
+      employeeId: { $in: teamMemberIds },
+      ...dateQuery
+    }).populate('employeeId', 'First\ name Last\ name Employee\ Code')
+      .sort({ date: -1 });
+    
+    res.json({
+      success: true,
+      teamMembers: teamMembers,
+      attendance: attendanceRecords
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching team attendance:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
-// GET /api/teamleader/department-leaves
-// DESC: Get all leaves from the team leader's department
+// ✅ Fixed: Department leaves with consistent user ID
 router.get('/department-leaves', auth, checkTeamLeader, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.id);
+    // ✅ Fixed: Use _id consistently
+    const currentUser = await User.findById(req.user._id);
     const department = currentUser.Department;
 
     if (!department) {
@@ -344,9 +380,12 @@ router.get('/department-leaves', auth, checkTeamLeader, async (req, res) => {
     // Sort by applied date (newest first)
     departmentLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
 
-    res.json(departmentLeaves);
+    res.json({
+      success: true,
+      departmentLeaves: departmentLeaves
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching department leaves:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 });

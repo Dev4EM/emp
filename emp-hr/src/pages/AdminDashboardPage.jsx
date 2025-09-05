@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllUsers } from '../components/Api';
-import { downloadAllAttendanceCSV, downloadEmployeeAttendanceCSV } from '../components/Api';
-
+import { downloadAllAttendanceCSV, downloadEmployeeAttendanceCSV } from '../components/Api'; // ✅ Updated import path
 import { toast, ToastContainer } from 'react-toastify';
 import UserDetailsSidePanel from '../components/UserDetailsSidePanel.jsx';
 import PeopleIcon from '@mui/icons-material/People';
@@ -25,14 +24,20 @@ function AdminDashboardPage() {
       const response = await getAllUsers();
       console.log('Users response:', response);
 
-      if (response && Array.isArray(response.users)) {
+      // ✅ Enhanced response handling for different backend response formats
+      if (response && response.success && Array.isArray(response.users)) {
         setUsers(response.users);
+      } else if (response && Array.isArray(response.users)) {
+        setUsers(response.users);
+      } else if (Array.isArray(response)) {
+        setUsers(response);
       } else {
         console.error("getAllUsers response is not in the expected format:", response);
         setUsers([]);
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to fetch users.');
+      console.error('Error fetching users:', err);
+      toast.error(err.message || 'Failed to fetch users.');
     } finally {
       setIsLoading(false);
     }
@@ -57,12 +62,16 @@ function AdminDashboardPage() {
     setSelectedUser(updatedUser);
   };
 
-  const departments = ['All', ...new Set(users.map(user => user.Department || user.department).filter(Boolean))];
+  // ✅ Enhanced filtering for better compatibility
+  const departments = ['All', ...new Set(users.map(user => user.Department || user.department || user['Department']).filter(Boolean))];
   const userTypes = ['All', 'admin', 'teamleader', 'employee'];
 
   const filteredUsers = users
     .filter(user =>
-      (selectedDepartment === 'All' || user.Department === selectedDepartment || user.department === selectedDepartment)
+      (selectedDepartment === 'All' || 
+       user.Department === selectedDepartment || 
+       user.department === selectedDepartment ||
+       user['Department'] === selectedDepartment)
     )
     .filter(user =>
       (selectedUserType === 'All' || user.userType === selectedUserType)
@@ -78,7 +87,7 @@ function AdminDashboardPage() {
     const total = users.length;
     const admins = users.filter(u => u.userType === 'admin').length;
     const teamleaders = users.filter(u => u.userType === 'teamleader').length;
-    const employees = users.filter(u => u.userType === 'employee').length;
+    const employees = users.filter(u => u.userType === 'employee' || !u.userType).length;
     return { total, admins, teamleaders, employees };
   };
 
@@ -102,6 +111,29 @@ function AdminDashboardPage() {
       employee: 'bg-emerald-600'
     };
     return colors[userType] || colors.employee;
+  };
+
+  // ✅ Enhanced CSV download functions
+  const handleDownloadAllCSV = async () => {
+    try {
+      toast.info('Preparing CSV download...');
+      await downloadAllAttendanceCSV();
+      toast.success('All attendance CSV downloaded successfully!');
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error(error.message || 'Failed to download CSV');
+    }
+  };
+
+  const handleDownloadEmployeeCSV = async (employeeId, employeeName) => {
+    try {
+      toast.info(`Preparing ${employeeName}'s attendance CSV...`);
+      await downloadEmployeeAttendanceCSV(employeeId);
+      toast.success(`${employeeName}'s attendance CSV downloaded successfully!`);
+    } catch (error) {
+      console.error('Employee CSV download failed:', error);
+      toast.error(error.message || 'Failed to download employee CSV');
+    }
   };
 
   return (
@@ -178,6 +210,7 @@ function AdminDashboardPage() {
                 <FilterListIcon className="text-emerald-400" />
                 <h3 className="text-lg font-semibold">Filters & Search</h3>
               </div>
+              
               <Link to="/add-employee" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded">
                 Add User
               </Link>
@@ -190,7 +223,7 @@ function AdminDashboardPage() {
                     type="text"
                     placeholder="Search users..."
                     value={searchTerm}
-                    className="pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-64"
+                    className="pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
@@ -221,30 +254,25 @@ function AdminDashboardPage() {
               </div>
             </div>
           </div>
-          <div className="mt-6 flex space-x-4">
-           <button
-    onClick={async () => {
-      try {
-        toast.info('Preparing CSV download...');
-        await downloadAllAttendanceCSV();
-        toast.success('All attendance CSV downloaded successfully!');
-      } catch (error) {
-        console.error('Download failed:', error);
-        toast.error(error.message || 'Failed to download CSV');
-      }
-    }}
-    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 font-medium"
-  >
-     Download All Attendance CSV
-  </button>
 
+          {/* ✅ Enhanced CSV Download Section */}
+          <div className="mb-6 flex flex-wrap gap-4">
+            <button
+              onClick={handleDownloadAllCSV}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 font-medium"
+            >
+              📊 Download All Attendance CSV
+            </button>
 
             {selectedUser && (
               <button
-                onClick={() => window.open(downloadEmployeeAttendanceCSV(selectedUser._id), '_blank')}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                onClick={() => handleDownloadEmployeeCSV(
+                  selectedUser._id, 
+                  `${selectedUser['First name']} ${selectedUser['Last name']}`
+                )}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 font-medium"
               >
-                Download {selectedUser['First name']}'s Attendance CSV
+                📋 Download {selectedUser['First name']}'s CSV
               </button>
             )}
           </div>
@@ -265,9 +293,7 @@ function AdminDashboardPage() {
                     }`}
                   onClick={() => handleUserClick(user)}
                 >
-
                   <div className="flex items-center space-x-3 mb-4">
-
                     {getUserTypeIcon(user.userType)}
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold truncate">

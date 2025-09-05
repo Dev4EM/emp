@@ -24,11 +24,11 @@ const handleApiRequest = async (apiCall) => {
     const response = await apiCall();
     return response.data;
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.error || 
-                        error.message || 
-                        'An unexpected error occurred';
-    
+    const errorMessage = error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      'An unexpected error occurred';
+
     console.error('API Error:', errorMessage);
     throw new Error(errorMessage);
   }
@@ -61,7 +61,7 @@ export const downloadAllAttendanceCSV = async () => {
         'Accept': 'text/csv'
       }
     });
-    
+
     // Create blob URL and trigger download
     const blob = new Blob([response.data], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -73,7 +73,7 @@ export const downloadAllAttendanceCSV = async () => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
+
     return { success: true };
   } catch (error) {
     console.error('Download error:', error);
@@ -90,7 +90,7 @@ export const downloadEmployeeAttendanceCSV = async (employeeId) => {
         'Accept': 'text/csv'
       }
     });
-    
+
     // Extract filename from response headers if available
     const contentDisposition = response.headers['content-disposition'];
     let filename = `employee_attendance.csv`;
@@ -100,7 +100,7 @@ export const downloadEmployeeAttendanceCSV = async (employeeId) => {
         filename = filenameMatch[18];
       }
     }
-    
+
     // Create blob and trigger download
     const blob = new Blob([response.data], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -112,7 +112,7 @@ export const downloadEmployeeAttendanceCSV = async (employeeId) => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
+
     return { success: true };
   } catch (error) {
     console.error('Download error:', error);
@@ -138,13 +138,13 @@ export const getUser = async () => {
 export const updateUser = async (userId, userData) => {
   try {
     console.log('Updating user:', userId, 'with data:', userData); // Debug log
-    
+
     const response = await API.put(`/admin/update-user/${userId}`, userData, {
       headers: {
         'Content-Type': 'application/json',
       }
     });
-    
+
     return response.data;
   } catch (error) {
     console.error('Update user error:', error);
@@ -155,12 +155,12 @@ export const updateUser = async (userId, userData) => {
 
 // Employee APIs
 export const getMyAttendance = async () => {
-    const response = await API.get('/employee/my-attendance');
-    return response.data;
+  const response = await API.get('/employee/my-attendance');
+  return response.data;
 };
 export const getLeaveBalance = async () => {
-    const response = await API.get('/employee/leave-balance');
-    return response.data;
+  const response = await API.get('/employee/leave-balance');
+  return response.data;
 };
 // Change password function
 export const changePassword = async (passwordData) => {
@@ -169,15 +169,15 @@ export const changePassword = async (passwordData) => {
 };
 export const applyLeave = (leaveData) => API.post('/employee/apply-leave', leaveData);
 export const getPastLeaves = async (page = 1, limit = 10) => {
-    const response = await API.get(`/employee/past-leaves?page=${page}&limit=${limit}`);
-    return response.data;
+  const response = await API.get(`/employee/past-leaves?page=${page}&limit=${limit}`);
+  return response.data;
 };
 export const cancelLeave = async (leaveToCancel, leaves, setLeaves, closeCancelModal, toast) => {
   const response = await API.delete(`/employee/delete-leave/${leaveToCancel}`);
   console.log('Cancel leave response:', response); // Debug log
   return response.data;
 }
- 
+
 export const checkIn = async (locationData) => {
   const response = await API.post('/employee/check-in', {
     location: locationData,
@@ -273,8 +273,8 @@ export const getUserLeaveBalance = async (userId) => {
 
 // Team Leader APIs
 export const addEmployee = async (employeeData) => {
-    const response = await API.post('/teamleader/add-employee', employeeData);
-    return response.data;
+  const response = await API.post('/teamleader/add-employee', employeeData);
+  return response.data;
 };
 
 export default API;

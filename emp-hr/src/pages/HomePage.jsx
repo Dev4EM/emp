@@ -7,7 +7,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AttendCalen from '../components/AttendCalen';
-import { checkIn, checkOut, getUser } from '../components/Api';
+import { checkIn, checkOut, getUser, getMyAttendance } from '../components/Api'; // ✅ Add getMyAttendance
 import CalendarMonthView from '../components/CalendarMonthView';
 
 import { useGeolocated } from 'react-geolocated';
@@ -17,6 +17,8 @@ import 'react-toastify/dist/ReactToastify.css';
 function HomePage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [attendanceData, setAttendanceData] = useState([]); // ✅ New state for attendance
+  const [todayAttendance, setTodayAttendance] = useState(null); // ✅ Today's specific attendance
   const [checkInTime, setCheckInTime] = useState(null);
   const [checkOutTime, setCheckOutTime] = useState(null);
   const [checkInAddress, setCheckInAddress] = useState('');
@@ -36,6 +38,7 @@ function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
+  // ✅ Updated: Find today's attendance from new collection data
   const extractTodayAttendance = (attendanceList) => {
     const today = new Date();
     const todayUTCString = today.toISOString().split('T')[0];
@@ -76,28 +79,54 @@ function HomePage() {
     }
   };
 
-  const fetchUser = async () => {
+  // ✅ Updated: Fetch user and attendance separately
+  const fetchUserData = async () => {
     try {
       const userData = await getUser();
       setUser(userData);
-      const todayAttendance = extractTodayAttendance(userData.attendance || []);
-      if (todayAttendance?.checkIn) {
-        setCheckInTime(todayAttendance.checkIn);
-        setHasCheckedIn(true);
-        setCheckInAddress(todayAttendance.checkInLocation?.address || 'Address not available');
-      }
-      if (todayAttendance?.checkOut) {
-        setCheckOutTime(todayAttendance.checkOut);
-        setHasCheckedOut(true);
-        setCheckOutAddress(todayAttendance.checkOutLocation?.address || 'Address not available');
-      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error fetching user data.');
-    } finally {
-      setLoading(false);
     }
   };
 
+  // ✅ New: Fetch attendance data separately
+  const fetchAttendanceData = async () => {
+    try {
+      // Get current month's attendance
+      const currentDate = new Date();
+      const month = currentDate.getMonth() + 1;
+      const year = currentDate.getFullYear();
+      
+      const response = await getMyAttendance(month, year);
+      
+      if (response.success) {
+        const attendance = response.attendance || [];
+        setAttendanceData(attendance);
+        
+        // Find today's attendance
+        const todayRecord = extractTodayAttendance(attendance);
+        setTodayAttendance(todayRecord);
+        
+        if (todayRecord) {
+          if (todayRecord.checkIn) {
+            setCheckInTime(todayRecord.checkIn);
+            setHasCheckedIn(true);
+            setCheckInAddress(todayRecord.checkInLocation?.address || 'Address not available');
+          }
+          if (todayRecord.checkOut) {
+            setCheckOutTime(todayRecord.checkOut);
+            setHasCheckedOut(true);
+            setCheckOutAddress(todayRecord.checkOutLocation?.address || 'Address not available');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching attendance:', err);
+      toast.error('Error fetching attendance data.');
+    }
+  };
+
+  // ✅ Updated: Handle check-in with new backend response
   const handleCheckIn = async () => {
     if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
       toast.error('Please enable location services to check in.');
@@ -108,10 +137,18 @@ function HomePage() {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
       const response = await checkIn({ lat: latitude, lng: longitude, address });
-      setCheckInTime(response.attendance.checkIn);
-      setHasCheckedIn(true);
-      setCheckInAddress(address);
-      toast.success(response.message);
+      
+      if (response.success) {
+        // Update state with new attendance record
+        setTodayAttendance(response.attendance);
+        setCheckInTime(response.attendance.checkIn);
+        setHasCheckedIn(true);
+        setCheckInAddress(address);
+        toast.success(response.message);
+        
+        // Refresh attendance data
+        await fetchAttendanceData();
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Check-in failed.');
     } finally {
@@ -119,6 +156,7 @@ function HomePage() {
     }
   };
 
+  // ✅ Updated: Handle check-out with new backend response
   const handleCheckOut = async () => {
     if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
       toast.error('Please enable location services to check out.');
@@ -129,10 +167,18 @@ function HomePage() {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
       const response = await checkOut({ lat: latitude, lng: longitude, address });
-      setCheckOutTime(new Date().toISOString());
-      setHasCheckedOut(true);
-      setCheckOutAddress(address);
-      toast.success(response.message);
+      
+      if (response.success) {
+        // Update state with updated attendance record
+        setTodayAttendance(response.attendance);
+        setCheckOutTime(response.attendance.checkOut);
+        setHasCheckedOut(true);
+        setCheckOutAddress(address);
+        toast.success(response.message);
+        
+        // Refresh attendance data
+        await fetchAttendanceData();
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Check-out failed.');
     } finally {
@@ -140,8 +186,18 @@ function HomePage() {
     }
   };
 
+  // ✅ Updated: Load data on component mount
   useEffect(() => {
-    fetchUser();
+    const loadInitialData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchUserData(),
+        fetchAttendanceData()
+      ]);
+      setLoading(false);
+    };
+
+    loadInitialData();
   }, []);
 
   if (loading) {
@@ -220,8 +276,8 @@ function HomePage() {
               </div>
 
               {(hasCheckedIn || hasCheckedOut) && (
-                <div className="grid grid-cols-1 md:grid-cols-2  gap-6">
-                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked  In" time={formatTime(checkInTime)} address={checkInAddress} />}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked In" time={formatTime(checkInTime)} address={checkInAddress} />}
                   {hasCheckedOut && <InfoCard icon={<LogoutOutlinedIcon />} title="Checked Out" time={formatTime(checkOutTime)} address={checkOutAddress} />}
                   {workDuration && <InfoCard icon={<SpeedIcon />} title="Work Duration" time={workDuration} />}
                 </div>
@@ -234,32 +290,49 @@ function HomePage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600 text-sm">Attendance This Month</span>
-                    <span className="font-bold text-slate-800">{user?.attendance?.length || 0} days</span>
+                    <span className="font-bold text-slate-800">{attendanceData?.length || 0} days</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600 text-sm">Paid Leave Balance</span>
                     <span className="font-bold text-slate-800">{user?.paidLeaveBalance || 0}</span>
+                  </div>
+                  {/* ✅ New: Show today's status */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600 text-sm">Today's Status</span>
+                    <span className={`font-bold text-sm ${
+                      todayAttendance?.status === 'Present' ? 'text-green-600' :
+                      todayAttendance?.status === 'Half Day' ? 'text-yellow-600' :
+                      'text-gray-600'
+                    }`}>
+                      {todayAttendance?.status || 'Not Checked In'}
+                    </span>
                   </div>
                 </div>
               </div>
             </aside>
           </main>
 
-         
-<section className="mt-8">
-  <div className="bg-white p-6 rounded-lg shadow-sm">
-    <h2 className="text-xl font-bold text-slate-800 mb-4">Attendance Calendar</h2>
-    <CalendarMonthView
-      attendance={user?.attendance || []}
-      onDaySelect={(date, record) => {
-        // Optional: show a toast or open a modal with full day details
-        // Example:
-        // toast.info(record ? `In: ${record.checkIn}\nOut: ${record.checkOut || 'N/A'}` : 'No attendance record');
-      }}
-    />
-  </div>
-</section>
-
+          {/* ✅ Updated: Pass attendance data to calendar */}
+          <section className="mt-8">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-xl font-bold text-slate-800 mb-4">Attendance Calendar</h2>
+              <CalendarMonthView
+                attendance={attendanceData || []} // ✅ Use separate attendance data
+                onDaySelect={(date, record) => {
+                  // Optional: show a toast or open a modal with full day details
+                  if (record) {
+                    const checkInTime = new Date(record.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                    const checkOutTime = record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Not checked out';
+                    toast.info(`${date}: In: ${checkInTime}, Out: ${checkOutTime}`, {
+                      autoClose: 5000
+                    });
+                  } else {
+                    toast.info(`${date}: No attendance record`);
+                  }
+                }}
+              />
+            </div>
+          </section>
         </div>
       </div>
     </>
@@ -267,3 +340,4 @@ function HomePage() {
 }
 
 export default HomePage;
+HomePage;

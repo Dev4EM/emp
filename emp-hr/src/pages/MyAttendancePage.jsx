@@ -10,23 +10,32 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 function MyAttendancePage() {
   const [attendance, setAttendance] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // ✅ Updated naming
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // ✅ Updated naming
 
+  // ✅ Updated useEffect to fetch from new API with month/year params
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
-        const response = await getMyAttendance();
-        setAttendance(response);
+        setIsLoading(true);
+        const response = await getMyAttendance(selectedMonth, selectedYear);
+        
+        if (response.success) {
+          setAttendance(response.attendance || []);
+        } else {
+          setAttendance([]);
+        }
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to fetch attendance.');
+        console.error('Error fetching attendance:', err);
+        toast.error(err.message || 'Failed to fetch attendance.');
+        setAttendance([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchAttendance();
-  }, []);
+  }, [selectedMonth, selectedYear]); // ✅ Updated dependencies
 
   const formatDate = (dateString) => {
     const options = { 
@@ -47,7 +56,16 @@ function MyAttendancePage() {
     });
   };
 
-  const calculateWorkDuration = (checkIn, checkOut) => {
+  // ✅ Updated to use totalHours from backend or calculate if needed
+  const calculateWorkDuration = (checkIn, checkOut, totalHours) => {
+    // Use backend calculated totalHours if available
+    if (totalHours) {
+      const hours = Math.floor(totalHours);
+      const minutes = Math.floor((totalHours % 1) * 60);
+      return `${hours}h ${minutes}m`;
+    }
+    
+    // Fallback to manual calculation
     if (!checkIn || !checkOut) return 'N/A';
     
     const checkInTime = new Date(checkIn);
@@ -59,35 +77,37 @@ function MyAttendancePage() {
     return `${diffHours}h ${diffMinutes}m`;
   };
 
+  // ✅ Updated stats calculation for new data structure
   const getAttendanceStats = () => {
     const totalDays = attendance.length;
-    const completeDays = attendance.filter(record => record.checkIn && record.checkOut).length;
-    const incompleteDays = totalDays - completeDays;
+    const completeDays = attendance.filter(record => record.status === 'Present').length;
+    const halfDays = attendance.filter(record => record.status === 'Half Day').length;
+    const absentDays = attendance.filter(record => record.status === 'Absent').length;
     
-    const totalWorkMinutes = attendance
-      .filter(record => record.checkIn && record.checkOut)
-      .reduce((total, record) => {
-        const checkIn = new Date(record.checkIn);
-        const checkOut = new Date(record.checkOut);
-        const diffMs = checkOut - checkIn;
-        return total + (diffMs / (1000 * 60));
-      }, 0);
+    const totalHours = attendance.reduce((total, record) => {
+      return total + (record.totalHours || 0);
+    }, 0);
     
-    const avgWorkHours = totalWorkMinutes > 0 ? (totalWorkMinutes / completeDays / 60).toFixed(1) : 0;
+    const avgWorkHours = totalDays > 0 ? (totalHours / totalDays).toFixed(1) : 0;
     
-    return { totalDays, completeDays, incompleteDays, avgWorkHours };
+    return { totalDays, completeDays, halfDays, absentDays, avgWorkHours };
   };
 
+  // ✅ Updated status badge to use backend status
   const getStatusBadge = (record) => {
-    if (!record.checkIn) return <span className="px-2 py-1 bg-red-600 text-white text-xs rounded-full">Absent</span>;
-    if (!record.checkOut) return <span className="px-2 py-1 bg-yellow-600 text-white text-xs rounded-full">Incomplete</span>;
-    return <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">Complete</span>;
+    const status = record.status;
+    
+    switch (status) {
+      case 'Present':
+        return <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">Present</span>;
+      case 'Half Day':
+        return <span className="px-2 py-1 bg-yellow-600 text-white text-xs rounded-full">Half Day</span>;
+      case 'Absent':
+        return <span className="px-2 py-1 bg-red-600 text-white text-xs rounded-full">Absent</span>;
+      default:
+        return <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded-full">Unknown</span>;
+    }
   };
-
-  const filteredAttendance = attendance.filter(record => {
-    const recordDate = new Date(record.date);
-    return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
-  });
 
   const stats = getAttendanceStats();
 
@@ -99,31 +119,31 @@ function MyAttendancePage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-emerald-400 mb-4">My Attendance</h1>
           
-          {/* Month/Year Filter */}
+          {/* ✅ Updated Month/Year Filter */}
           <div className="flex flex-wrap gap-4 mb-6">
             <select 
-              value={currentMonth} 
-              onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
               className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white"
             >
               {Array.from({ length: 12 }, (_, i) => (
-                <option key={i} value={i}>
+                <option key={i} value={i + 1}>
                   {new Date(2024, i).toLocaleString('en-US', { month: 'long' })}
                 </option>
               ))}
             </select>
             <select 
-              value={currentYear} 
-              onChange={(e) => setCurrentYear(parseInt(e.target.value))}
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white"
             >
-              {[2023, 2024, 2025].map(year => (
+              {[2023, 2024, 2025, 2026].map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
           </div>
 
-          {/* Stats Summary */}
+          {/* ✅ Updated Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
@@ -135,16 +155,16 @@ function MyAttendancePage() {
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <WorkIcon className="text-green-400" />
-                <p className="text-sm text-gray-400">Complete Days</p>
+                <p className="text-sm text-gray-400">Present Days</p>
               </div>
               <p className="text-2xl font-bold text-green-400">{stats.completeDays}</p>
             </div>
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <AccessTimeIcon className="text-yellow-400" />
-                <p className="text-sm text-gray-400">Incomplete Days</p>
+                <p className="text-sm text-gray-400">Half Days</p>
               </div>
-              <p className="text-2xl font-bold text-yellow-400">{stats.incompleteDays}</p>
+              <p className="text-2xl font-bold text-yellow-400">{stats.halfDays}</p>
             </div>
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
@@ -160,7 +180,7 @@ function MyAttendancePage() {
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-400"></div>
           </div>
-        ) : filteredAttendance.length > 0 ? (
+        ) : attendance.length > 0 ? (
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-8">
@@ -177,8 +197,8 @@ function MyAttendancePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {filteredAttendance.map((record, index) => (
-                      <tr key={record.date || index} className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}>
+                    {attendance.map((record, index) => (
+                      <tr key={record._id || index} className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <CalendarTodayIcon className="w-4 h-4 mr-2 text-emerald-400" />
@@ -201,7 +221,8 @@ function MyAttendancePage() {
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-blue-400">
-                            {calculateWorkDuration(record.checkIn, record.checkOut)}
+                            {/* ✅ Use backend totalHours or calculate */}
+                            {calculateWorkDuration(record.checkIn, record.checkOut, record.totalHours)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -224,8 +245,8 @@ function MyAttendancePage() {
 
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
-              {filteredAttendance.map((record, index) => (
-                <div key={record.date || index} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              {attendance.map((record, index) => (
+                <div key={record._id || index} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center">
                       <CalendarTodayIcon className="w-5 h-5 mr-2 text-emerald-400" />
@@ -254,7 +275,7 @@ function MyAttendancePage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-400">Duration:</span>
                       <span className="font-semibold text-blue-400">
-                        {calculateWorkDuration(record.checkIn, record.checkOut)}
+                        {calculateWorkDuration(record.checkIn, record.checkOut, record.totalHours)}
                       </span>
                     </div>
                     

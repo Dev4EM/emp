@@ -85,6 +85,33 @@ const UserSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+ 
+
+// Add helper methods for attendance
+UserSchema.methods.getTodaysAttendance = async function() {
+    const Attendance = require('./Attendance');
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    
+    return await Attendance.findOne({
+        employeeId: this._id,
+        date: { $gte: startOfDay, $lt: endOfDay }
+    });
+};
+
+UserSchema.methods.getMonthlyAttendance = async function(year, month) {
+    const Attendance = require('./Attendance');
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    
+    return await Attendance.find({
+        employeeId: this._id,
+        date: { $gte: startDate, $lte: endDate }
+    }).sort({ date: 1 });
+};
+
 UserSchema.methods.comparePassword = async function(enteredPassword) {
     return enteredPassword === this.password;
 };

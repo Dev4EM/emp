@@ -2,62 +2,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
-const { default: mongoose } = require('mongoose');
+const Attendance = require('../models/Attendance'); // Add this import
 const json2csv = require('json2csv').parse;
-
-function normalizeToDay(date = new Date()) {
-  const dayString = date.toISOString().split('T')[0]; // 'YYYY-MM-DD' in UTC
-  const dayDate = new Date(dayString + 'T00:00:00.000Z'); // Z denotes UTC
-  return { dayString, dayDate };
-}
-
-// Helper function to format datetime
-// Helper functions for date formatting
-const formatDate = (isoString) => {
-  if (!isoString) return '';
-  
-  try {
-    const date = new Date(isoString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    
-    return `${day}-${month}-${year}`;
-  } catch (error) {
-    console.error('Date formatting error:', error);
-    return isoString;
-  }
-};
-
-const formatDateTime = (isoString) => {
-  if (!isoString) return '';
-  
-  try {
-    const date = new Date(isoString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${day}-${month}-${year} ${hours}:${minutes}`;
-  } catch (error) {
-    console.error('DateTime formatting error:', error);
-    return isoString;
-  }
-};
-
-
-function calculateAttendanceStatus(checkIn, checkOut) {
-  if (!checkIn || !checkOut) {
-    return { totalHours: 0, status: 'Absent' };
-  }
-  const hours = (new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60);
-  return {
-    totalHours: hours,
-    status: hours >= 8.45 ? 'Present' : 'Absent',
-  };
-}
 
 // Middleware to check if user is an admin
 const checkAdmin = (req, res, next) => {
@@ -66,90 +12,397 @@ const checkAdmin = (req, res, next) => {
   }
   next();
 };
-router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
+
+// Helper function to format dates
+const formatDate = (date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-US');
+};
+
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return '';
+  return new Date(dateTime).toLocaleString('en-US');
+};
+
+// ✅ GET /api/admin/attendance - Get all attendance records
+router.get('/attendance', auth, checkAdmin, async (req, res) => {
   try {
-    // Get all user fields to ensure name fields are included
-    const users = await User.find({}, {
-      attendance: 1,
-      'First name': 1,
-      'Last name': 1,
-      firstName: 1,
-      lastName: 1
-    });
+    const { page = 1, limit = 50, month, year, employeeId } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query filters
+    let query = {};
     
-    const records = [];
-    users.forEach(user => {
-      if (user.attendance && user.attendance.length > 0) {
-        user.attendance.forEach(a => {
-          const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
-          
-          // Use multiple fallback options for name fields
-          const firstName = user['First name'] || user.firstName || 'Unknown';
-          const lastName = user['Last name'] || user.lastName || 'User';
-          
-          records.push({
-            Employee: `${firstName} ${lastName}`.trim(),
-            Date: a.date ? a.date.toISOString().split('T')[0] : '',
-            'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
-            'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
-            'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-            Status: status || 'Unknown'
-          });
-        });
+    if (employeeId) {
+      query.employeeId = employeeId;
+    }
+    
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+
+    // Get attendance records with employee details
+    const attendanceRecords = await Attendance.find(query)
+      .populate('employeeId', 'First\ name Last\ name Employee\ Code Department Designation')
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalRecords = await Attendance.countDocuments(query);
+    const totalPages = Math.ceil(totalRecords / parseInt(limit));
+
+    res.json({
+      success: true,
+      attendance: attendanceRecords,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: totalPages,
+        totalRecords: totalRecords,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1
       }
     });
 
-    const csv = json2csv(records);
-    res.header('Content-Type', 'text/csv');
-    res.attachment('all_employees_attendance.csv');
-    return res.send(csv);
-
-  } catch (err) {
-    console.error('CSV generation error:', err);
-    res.status(500).json({ message: 'Server error' });
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching attendance records',
+      error: error.message 
+    });
   }
 });
 
-
-router.get('/attendance/:employeeId/csv', auth, checkAdmin, async (req, res) => {
+// ✅ GET /api/admin/attendance/all/csv - Download all attendance as CSV
+router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
   try {
-    const employeeId = req.params.employeeId;
+    const { month, year } = req.query;
     
-    // ✅ FIX: Use findById to get the specific user, not find({}) which gets all users
-    const user = await User.findById(employeeId).select('attendance "First name" "Last name" firstName lastName');
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    // Build query filters for CSV
+    let query = {};
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      query.date = { $gte: startDate, $lte: endDate };
     }
 
-    if (!user.attendance || user.attendance.length === 0) {
-      return res.status(404).json({ message: "No attendance records found for this user" });
+    // Get all attendance records
+    const attendanceRecords = await Attendance.find(query)
+      .populate('employeeId', 'First\ name Last\ name Employee\ Code Department Designation')
+      .sort({ date: -1 });
+
+    if (attendanceRecords.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No attendance records found' 
+      });
     }
 
-    // Handle name fields with fallbacks 
-    const employeeName = `${firstName} ${lastName}`.trim();
-
-    const records = user.attendance.map(a => {
-      const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+    // Format data for CSV
+    const csvData = attendanceRecords.map(record => {
+      const employee = record.employeeId;
       return {
-         Date: formatDate(a.date), // Format: 24-08-2025
-        'Check-in': formatDateTime(a.checkIn), // Format: 24-08-2025 11:36
-        'Check-out': formatDateTime(a.checkOut), // Format: 24-08-2025 16:45
-        'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-        Status: status || 'Unknown'
+        'Employee Name': employee ? `${employee['First name']} ${employee['Last name']}` : 'N/A',
+        'Employee Code': employee ? employee['Employee Code'] : 'N/A',
+        'Department': employee ? employee['Department'] : 'N/A',
+        'Designation': employee ? employee['Designation'] : 'N/A',
+        'Date': formatDate(record.date),
+        'Check In': formatDateTime(record.checkIn),
+        'Check Out': formatDateTime(record.checkOut),
+        'Total Hours': record.totalHours ? record.totalHours.toFixed(2) : '0.00',
+        'Status': record.status || 'Unknown',
+        'Check In Location': record.checkInLocation?.address || 'N/A',
+        'Check Out Location': record.checkOutLocation?.address || 'N/A'
       };
     });
 
-    const csv = json2csv(records);
+    // Generate CSV
+    const csv = json2csv(csvData);
+    
+    // Set headers for file download
+    const fileName = month && year 
+      ? `attendance_${year}_${month.toString().padStart(2, '0')}.csv`
+      : `all_attendance_${new Date().toISOString().split('T')[0]}.csv`;
+      
     res.header('Content-Type', 'text/csv');
-    res.attachment(`${employeeName.replace(/\s+/g, '_')}_attendance.csv`);
+    res.attachment(fileName);
     return res.send(csv);
 
-  } catch (err) {
-    console.error('CSV generation error:', err);
-    res.status(500).json({ message: 'Server error' });
+  } catch (error) {
+    console.error('CSV generation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error generating CSV',
+      error: error.message 
+    });
   }
 });
+
+// ✅ GET /api/admin/attendance/:employeeId/csv - Download specific employee attendance as CSV
+router.get('/attendance/:employeeId/csv', auth, checkAdmin, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { month, year } = req.query;
+    
+    // Check if employee exists
+    const employee = await User.findById(employeeId).select('First\ name Last\ name Employee\ Code Department Designation');
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employee not found' 
+      });
+    }
+
+    // Build query
+    let query = { employeeId: employeeId };
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+
+    // Get attendance records for specific employee
+    const attendanceRecords = await Attendance.find(query).sort({ date: -1 });
+
+    if (attendanceRecords.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No attendance records found for this employee' 
+      });
+    }
+
+    // Format data for CSV
+    const csvData = attendanceRecords.map(record => ({
+      'Date': formatDate(record.date),
+      'Check In': formatDateTime(record.checkIn),
+      'Check Out': formatDateTime(record.checkOut),
+      'Total Hours': record.totalHours ? record.totalHours.toFixed(2) : '0.00',
+      'Status': record.status || 'Unknown',
+      'Check In Location': record.checkInLocation?.address || 'N/A',
+      'Check Out Location': record.checkOutLocation?.address || 'N/A',
+      'Remarks': record.remarks || ''
+    }));
+
+    // Generate CSV
+    const csv = json2csv(csvData);
+    
+    // Create filename with employee name
+    const employeeName = `${employee['First name']}_${employee['Last name']}`.replace(/\s+/g, '_');
+    const fileName = month && year 
+      ? `${employeeName}_attendance_${year}_${month.toString().padStart(2, '0')}.csv`
+      : `${employeeName}_attendance_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    res.header('Content-Type', 'text/csv');
+    res.attachment(fileName);
+    return res.send(csv);
+
+  } catch (error) {
+    console.error('Employee CSV generation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error generating employee CSV',
+      error: error.message 
+    });
+  }
+});
+
+// ✅ GET /api/admin/attendance/summary - Get attendance summary statistics
+router.get('/attendance/summary', auth, checkAdmin, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    
+    // Build date filter
+    let dateFilter = {};
+    if (month && year) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      dateFilter = { date: { $gte: startDate, $lte: endDate } };
+    }
+
+    // Get summary statistics using aggregation
+    const summary = await Attendance.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: null,
+          totalRecords: { $sum: 1 },
+          presentCount: { $sum: { $cond: [{ $eq: ['$status', 'Present'] }, 1, 0] } },
+          halfDayCount: { $sum: { $cond: [{ $eq: ['$status', 'Half Day'] }, 1, 0] } },
+          absentCount: { $sum: { $cond: [{ $eq: ['$status', 'Absent'] }, 1, 0] } },
+          totalHours: { $sum: '$totalHours' },
+          avgHours: { $avg: '$totalHours' }
+        }
+      }
+    ]);
+
+    // Get unique employee count
+    const uniqueEmployees = await Attendance.distinct('employeeId', dateFilter);
+
+    const stats = summary[0] || {
+      totalRecords: 0,
+      presentCount: 0,
+      halfDayCount: 0,
+      absentCount: 0,
+      totalHours: 0,
+      avgHours: 0
+    };
+
+    res.json({
+      success: true,
+      summary: {
+        ...stats,
+        uniqueEmployees: uniqueEmployees.length,
+        avgHours: parseFloat((stats.avgHours || 0).toFixed(2)),
+        totalHours: parseFloat((stats.totalHours || 0).toFixed(2))
+      },
+      period: month && year ? { month, year } : 'all_time'
+    });
+
+  } catch (error) {
+    console.error('Error fetching attendance summary:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching attendance summary',
+      error: error.message 
+    });
+  }
+});
+
+// ✅ PUT /api/admin/attendance/:userId - Update attendance record
+router.put('/attendance/:userId', auth, checkAdmin, async (req, res) => {
+  const { userId } = req.params;
+  const { date, checkIn, checkOut, attendanceId } = req.body;
+
+  if (!date || (!checkIn && !checkOut)) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'Date and at least one of check-in or check-out time are required' 
+    });
+  }
+
+  try {
+    // Normalize date
+    const targetDate = new Date(date);
+    const dayString = targetDate.toISOString().split('T')[0];
+    const dayDate = new Date(dayString + 'T00:00:00.000Z');
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    let attendanceRecord;
+
+    if (attendanceId) {
+      // Update existing attendance by ID
+      attendanceRecord = await Attendance.findById(attendanceId);
+      if (!attendanceRecord) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'Attendance record not found' 
+        });
+      }
+    } else {
+      // Find or create attendance for the date
+      attendanceRecord = await Attendance.findOne({
+        employeeId: userId,
+        date: dayDate
+      });
+    }
+
+    if (attendanceRecord) {
+      // Update existing record
+      if (checkIn && checkIn.trim() !== '') {
+        attendanceRecord.checkIn = new Date(`${dayString}T${checkIn}:00.000Z`);
+      }
+      
+      if (checkOut && checkOut.trim() !== '') {
+        attendanceRecord.checkOut = new Date(`${dayString}T${checkOut}:00.000Z`);
+      } else if (checkOut === '') {
+        attendanceRecord.checkOut = null;
+      }
+
+      await attendanceRecord.save();
+    } else {
+      // Create new attendance record
+      if (!checkIn || checkIn.trim() === '') {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Check-in time is required when creating a new attendance record' 
+        });
+      }
+
+      attendanceRecord = new Attendance({
+        employeeId: userId,
+        date: dayDate,
+        checkIn: new Date(`${dayString}T${checkIn}:00.000Z`),
+        checkOut: (checkOut && checkOut.trim() !== '') ? 
+          new Date(`${dayString}T${checkOut}:00.000Z`) : null,
+      });
+
+      await attendanceRecord.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Attendance updated successfully',
+      attendance: attendanceRecord,
+    });
+
+  } catch (error) {
+    console.error('Error updating attendance:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
+// ✅ DELETE /api/admin/attendance/:recordId - Delete attendance record
+router.delete('/attendance/:recordId', auth, checkAdmin, async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    
+    const deletedRecord = await Attendance.findByIdAndDelete(recordId);
+    
+    if (!deletedRecord) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Attendance record not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Attendance record deleted successfully',
+      deletedRecord: {
+        id: deletedRecord._id,
+        date: deletedRecord.date,
+        employeeId: deletedRecord.employeeId
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting attendance:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error deleting attendance record',
+      error: error.message 
+    });
+  }
+});
+
+
+
+
 
 // ROUTE: POST /api/admin/adduser
 // DESC: Add a new user
@@ -528,59 +781,6 @@ router.get('/dashboard-stats', auth, checkAdmin, async (req, res) => {
   }
 });
 
-// ROUTE: PUT /api/admin/attendance/:userId
-// DESC: Update attendance for a specific user
-router.put('/attendance/:userId', auth, checkAdmin, async (req, res) => {
-  const { userId } = req.params;
-  const { date, checkIn, checkOut } = req.body;
-
-  try {
-    const dayString = new Date(date).toISOString().split('T')[0];
-    const attendanceId = '68b919818e4b49edfa0d26bb'; // Get this from request
-
-    const updateFields = {};
-    if (checkIn && checkIn.trim() !== '') {
-      updateFields['attendance.$.checkIn'] = new Date(`${dayString}T${checkIn}:00.000Z`);
-    }
-    if (checkOut && checkOut.trim() !== '') {
-      updateFields['attendance.$.checkOut'] = new Date(`${dayString}T${checkOut}:00.000Z`);
-    } else if (checkOut === '') {
-      updateFields['attendance.$.checkOut'] = null;
-    }
-
-    // ✅ Direct MongoDB update with proper query
-    const result = await User.updateOne(
-      { 
-        _id: userId, 
-        'attendance._id': new mongoose.Types.ObjectId(attendanceId)
-      },
-      { 
-        $set: updateFields,
-        $inc: { __v: 1 } // Increment version manually
-      }
-    );
-
-    console.log('Update result:', result);
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: 'Attendance record not found' });
-    }
-
-    // Get updated record
-    const user = await User.findById(userId);
-    const updatedRecord = user.attendance.id(attendanceId);
-
-    res.json({
-      success: true,
-      message: 'Attendance updated successfully',
-      attendance: updatedRecord,
-    });
-
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
 
 
 router.put('/leave-balance/:userId', auth, checkAdmin, async (req, res) => {
