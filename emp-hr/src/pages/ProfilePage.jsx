@@ -250,10 +250,12 @@ function ProfilePage() {
                 {/* Change Password Button */}
                 <div className="mt-4 sm:mt-0">
                   <button
-                    onClick={() => setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })}
+                    onClick={() =>{ setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                    document.getElementById('passwordChangeSection').scrollIntoView({ behavior: 'smooth' });
+                  }}
                     className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-semibold transition-colors duration-200 flex items-center space-x-2"
                     data-toggle="modal"
-                    onClick={() => document.getElementById('passwordChangeSection').scrollIntoView({ behavior: 'smooth' })}
+  
                   >
                     <LockIcon className="w-4 h-4" />
                     <span>Change Password</span>
