@@ -88,14 +88,13 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
           const lastName = user['Last name'] || user.lastName || 'User';
           
           records.push({
-  Employee: `${firstName} ${lastName}`.trim(),
-  Date: formatDate(a.date), // Format: DD-MM-YYYY
-  'Check-in': formatIST(a.checkIn), // Format: DD-MM-YYYY HH:MM (IST)
-  'Check-out': formatIST(a.checkOut),
-  'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-  Status: status || 'Unknown'
-});
-
+            Employee: `${firstName} ${lastName}`.trim(),
+            Date: a.date ? a.date.toISOString().split('T')[0] : '',
+            'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
+            'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
+            'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
+            Status: status || 'Unknown'
+          });
         });
       }
     });
