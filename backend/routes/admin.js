@@ -13,15 +13,15 @@ function normalizeToDay(date = new Date()) {
 
 // Helper function to format datetime
 // Helper functions for date formatting
+// Format to DD-MM-YYYY in IST
 const formatDate = (isoString) => {
   if (!isoString) return '';
-  
   try {
     const date = new Date(isoString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    
+    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours
+    const day = String(istDate.getDate()).padStart(2, '0');
+    const month = String(istDate.getMonth() + 1).padStart(2, '0');
+    const year = istDate.getFullYear();
     return `${day}-${month}-${year}`;
   } catch (error) {
     console.error('Date formatting error:', error);
@@ -29,23 +29,54 @@ const formatDate = (isoString) => {
   }
 };
 
+// Format to DD-MM-YYYY HH:MM in IST
 const formatDateTime = (isoString) => {
   if (!isoString) return '';
-  
   try {
     const date = new Date(isoString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
+    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours
+    const day = String(istDate.getDate()).padStart(2, '0');
+    const month = String(istDate.getMonth() + 1).padStart(2, '0');
+    const year = istDate.getFullYear();
+    const hours = String(istDate.getHours()).padStart(2, '0');
+    const minutes = String(istDate.getMinutes()).padStart(2, '0');
     return `${day}-${month}-${year} ${hours}:${minutes}`;
   } catch (error) {
     console.error('DateTime formatting error:', error);
     return isoString;
   }
 };
+
+function calculateAttendanceStatusAndMark(checkIn, checkOut) {
+  if (!checkIn || !checkOut) {
+    return { totalHours: 0, status: 'Absent', mark: 'A | A' };
+  }
+
+  const startShiftTime = new Date(checkIn);
+  startShiftTime.setHours(3, 30, 0, 0); // 9:00 AM IST in UTC
+
+  const firstHalfLimit = new Date(startShiftTime.getTime() + 4 * 60 * 60 * 1000); // 1:00 PM IST
+  const secondHalfStart = new Date(startShiftTime.getTime() + 5 * 60 * 60 * 1000); // 2:00 PM IST
+
+  const checkInTime = new Date(checkIn);
+  const checkOutTime = new Date(checkOut);
+  const hours = (checkOutTime - checkInTime) / (1000 * 60 * 60);
+
+  let mark = 'A | A';
+  if (hours >= 9) {
+    mark = 'P | P';
+  } else if (checkInTime > firstHalfLimit && hours >= 4.5) {
+    mark = 'FH | P'; // Late check-in
+  } else if (checkOutTime < secondHalfStart && hours >= 4.5) {
+    mark = 'P | SH'; // Early check-out
+  }
+
+  return {
+    totalHours: hours,
+    status: hours >= 8.45 ? 'Present' : 'Absent',
+    mark
+  };
+}
 
 
 function calculateAttendanceStatus(checkIn, checkOut) {
@@ -81,20 +112,23 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
     users.forEach(user => {
       if (user.attendance && user.attendance.length > 0) {
         user.attendance.forEach(a => {
-          const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+          const { totalHours, status, mark } = calculateAttendanceStatusAndMark(a.checkIn, a.checkOut);
+
           
           // Use multiple fallback options for name fields
           const firstName = user['First name'] || user.firstName || 'Unknown';
           const lastName = user['Last name'] || user.lastName || 'User';
           
-          records.push({
-            Employee: `${firstName} ${lastName}`.trim(),
-            Date: a.date ? a.date.toISOString().split('T')[0] : '',
-            'Check-in': a.checkIn ? a.checkIn.toISOString() : '',
-            'Check-out': a.checkOut ? a.checkOut.toISOString() : '',
-            'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-            Status: status || 'Unknown'
-          });
+         records.push({
+  Employee: `${firstName} ${lastName}`.trim(),
+  Date: formatDate(a.date),
+  'Check-in': formatDateTime(a.checkIn),
+  'Check-out': formatDateTime(a.checkOut),
+  'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
+  Status: status || 'Unknown',
+});
+
+
         });
       }
     });
