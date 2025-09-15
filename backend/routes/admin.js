@@ -47,6 +47,36 @@ const formatDateTime = (isoString) => {
   }
 };
 
+function calculateAttendanceStatusAndMark(checkIn, checkOut) {
+  if (!checkIn || !checkOut) {
+    return { totalHours: 0, status: 'Absent', mark: 'A | A' };
+  }
+
+  const startShiftTime = new Date(checkIn);
+  startShiftTime.setHours(3, 30, 0, 0); // 9:00 AM IST in UTC
+
+  const firstHalfLimit = new Date(startShiftTime.getTime() + 4 * 60 * 60 * 1000); // 1:00 PM IST
+  const secondHalfStart = new Date(startShiftTime.getTime() + 5 * 60 * 60 * 1000); // 2:00 PM IST
+
+  const checkInTime = new Date(checkIn);
+  const checkOutTime = new Date(checkOut);
+  const hours = (checkOutTime - checkInTime) / (1000 * 60 * 60);
+
+  let mark = 'A | A';
+  if (hours >= 9) {
+    mark = 'P | P';
+  } else if (checkInTime > firstHalfLimit && hours >= 4.5) {
+    mark = 'FH | P'; // Late check-in
+  } else if (checkOutTime < secondHalfStart && hours >= 4.5) {
+    mark = 'P | SH'; // Early check-out
+  }
+
+  return {
+    totalHours: hours,
+    status: hours >= 8.45 ? 'Present' : 'Absent',
+    mark
+  };
+}
 
 
 function calculateAttendanceStatus(checkIn, checkOut) {
@@ -82,20 +112,23 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
     users.forEach(user => {
       if (user.attendance && user.attendance.length > 0) {
         user.attendance.forEach(a => {
-          const { totalHours, status } = calculateAttendanceStatus(a.checkIn, a.checkOut);
+          const { totalHours, status, mark } = calculateAttendanceStatusAndMark(a.checkIn, a.checkOut);
+
           
           // Use multiple fallback options for name fields
           const firstName = user['First name'] || user.firstName || 'Unknown';
           const lastName = user['Last name'] || user.lastName || 'User';
           
-          records.push({
+         records.push({
   Employee: `${firstName} ${lastName}`.trim(),
   Date: formatDate(a.date),
   'Check-in': formatDateTime(a.checkIn),
   'Check-out': formatDateTime(a.checkOut),
   'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-  Status: status || 'Unknown'
+  Status: status || 'Unknown',
+  Mark: mark || 'A | A'
 });
+
 
         });
       }
