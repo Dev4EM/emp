@@ -20,6 +20,7 @@ import ManageEmployeesPage from './pages/ManageEmployeesPage.jsx';
 import TeamAttendancePage from './pages/TeamAttendancePage';
 import ManageAppPage from './pages/ManageAppPage';
 import AddUserPage from './pages/AddUserPage';
+import TutorDashboard from './pages/TutorDashboard.jsx';
  
 // A component to conditionally render the layout
 const AppContent = () => {
@@ -52,6 +53,7 @@ const AppContent = () => {
               <Route path="/manage-employees" element={<ManageEmployeesPage />} />
               <Route path="/team-attendance" element={<TeamAttendancePage />} />
               <Route path="/manage-app" element={<ManageAppPage />} />
+              <Route path="/tutordash" element={<TutorDashboard />} />
             </Route>
 
           </Routes>
