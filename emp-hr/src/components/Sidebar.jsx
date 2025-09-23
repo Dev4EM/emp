@@ -125,7 +125,7 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
             <Item to="/my-attendance" icon={CalendarViewMonthOutlinedIcon} text="Attendance" />
             <Item to="/past-leaves" icon={HistoryOutlinedIcon} text="Past Leaves" />
             <Item to="/profile" icon={AccountCircleOutlinedIcon} text="Profile" />
-            {user?.Department=='IT Department' && <Item to="/tutorDash" icon={SatelliteAltIcon} text="Tutor Dashb" />}
+            {user?.Designation=='CSO' && <Item to="/tutorDash" icon={SatelliteAltIcon} text="Tutor Dashb" />}
             {/* {user?.Department=='Space Education & Research' && <Item to="/tutorDash" icon={SatelliteAltIcon} text="Tutor Dashb" />} */}
           </div>
 
