@@ -111,15 +111,15 @@ function ApplyLeavePage() {
     setIsModalOpen(true);
   };
 
-  const handleConfirmLeave = async () => {
+ const handleConfirmLeave = async () => {
   setIsModalOpen(false);
   setIsLoading(true);
-  
+
   try {
-    // Apply leave for each selected date
     const leaveApplications = selectedDates.map(date => {
       const dateString = format(date, 'yyyy-MM-dd');
-      const details = dateDetails[dateString];
+      const details = dateDetails[dateString] || { duration: 1, half: null };
+
       return {
         leaveDate: dateString,
         leaveType,
@@ -129,23 +129,20 @@ function ApplyLeavePage() {
       };
     });
 
-    // Apply leaves sequentially
     for (const application of leaveApplications) {
       await applyLeave(application);
     }
-    
+
     toast.success(`Successfully applied for leave on ${selectedDates.length} day(s)! Notifications sent to you and your manager.`);
 
-    // Reset form
     setSelectedDates([]);
     setDateDetails({});
     setLeaveType('paid');
     setReason('');
-    
-    // Refresh leave balance
+
     const updatedBalance = await getLeaveBalance();
     setLeaveBalance(updatedBalance);
-    
+
   } catch (err) {
     toast.error(err.message || 'Failed to apply for leave.');
   } finally {
