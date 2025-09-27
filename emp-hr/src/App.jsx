@@ -21,6 +21,7 @@ import TeamAttendancePage from './pages/TeamAttendancePage';
 import ManageAppPage from './pages/ManageAppPage';
 import AddUserPage from './pages/AddUserPage';
 import TutorDashboard from './pages/TutorDashboard.jsx';
+import Maintainance from './pages/Maintainance.jsx';
  
 // A component to conditionally render the layout
 const AppContent = () => {
@@ -39,7 +40,8 @@ const AppContent = () => {
         <Layout>
           <Routes>
             <Route element={<AuthWrapper />}>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<Maintainance/>} />
+              {/* <Route path="/" element={<HomePage />} /> */}
               <Route path="/applyLeave" element={<ApplyLeavePage />} />
               <Route path="/team-members" element={<TeamMembersPage />} />
               <Route path="/pending-leaves" element={<PendingLeavesPage />} />

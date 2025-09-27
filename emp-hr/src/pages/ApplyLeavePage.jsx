@@ -566,7 +566,7 @@ function ApplyLeavePage() {
               </div>
 
               {/* Quick Tips */}
-              <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl">
+              <div className=" p-6 rounded-2xl">
                 <h3 className="font-semibold text-blue-200 mb-3 flex items-center">
                   💡 Pro Tips
                 </h3>
