@@ -26,7 +26,7 @@ const Layout = ({ children }) => {
 
       <div className="md:grid md:grid-cols-[auto,1fr] md:h-screen">
         {/* Sidebar column */}
-        <Sidebar isSidebarOpen={isSidebarOpen} onCloseSidebar={closeSidebar} />
+        {/* <Sidebar isSidebarOpen={isSidebarOpen} onCloseSidebar={closeSidebar} /> */}
 
         {/* Main column */}
         <div className="flex flex-col md:overflow-hidden">
