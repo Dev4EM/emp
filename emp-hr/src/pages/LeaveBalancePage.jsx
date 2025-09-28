@@ -5,20 +5,57 @@ import { toast, ToastContainer } from 'react-toastify';
 function LeaveBalancePage() {
   const [leaveBalance, setLeaveBalance] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState();
 
-  useEffect(() => {
+
+  
     const fetchLeaveBalance = async () => {
       try {
         const response = await getLeaveBalance();
-        setLeaveBalance(response);
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to fetch leave balance.');
-      } finally {
-        setIsLoading(false);
+          toast.error(err.response?.data?.message || 'Failed to fetch leave balance.');
+        } finally {
+            setIsLoading(false);
+          }
+        };  
+        
+        useEffect(() => {
+          const fetchUser = async () => {
+    try {
+      const userData = await getUser();
+      setUser(userData);
+      console.log('thank you for fetch me userData', userData);
+      if (userData?.Department) {
+        try {
+          const deptWeekOff = await getDepartmentWeekOff(userData.Department);
+          // Convert week off days strings to numbers for calendar
+         
+          setDepartmentWeekOffDays(deptWeekOff.weekOffDays);
+        
+        } catch (err) {
+          console.error('Failed to fetch department week off', err);
+          toast.error("Your Department Not found! please contact With IT Department")
+        }
       }
-    };
-
-    fetchLeaveBalance();
+    }catch(err){
+        console.log(err)
+      }
+    }
+     
+const getLeaveBal= async () =>{
+      try{
+        const response =await getLeaveBalance(user?.id)
+        console.log(response)
+            setLeaveBalance(response);
+        console
+      }catch(err){
+console.log(err)
+      }
+     }
+     
+    fetchUser()
+    getLeaveBal()
+  
   }, []);
 
   return (

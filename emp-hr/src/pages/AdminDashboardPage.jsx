@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllUsers } from '../components/Api';
+import { getAllUsersDash } from '../components/Api';
 import { downloadAllAttendanceCSV, downloadEmployeeAttendanceCSV } from '../components/Api';
 
 import { toast, ToastContainer } from 'react-toastify';
@@ -22,13 +22,11 @@ function AdminDashboardPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await getAllUsers();
-      console.log('Users response:', response);
-
+      const response = await getAllUsersDash();
       if (response && Array.isArray(response.users)) {
         setUsers(response.users);
       } else {
-        console.error("getAllUsers response is not in the expected format:", response);
+        toast.error('Unexpected response format while fetching users');
         setUsers([]);
       }
     } catch (err) {
@@ -42,16 +40,8 @@ function AdminDashboardPage() {
     fetchUsers();
   }, []);
 
-  const handleUserClick = (user) => {
-    console.log('User clicked:', user);
-    setSelectedUser(user);
-  };
-
-  const handleCloseSidePanel = () => {
-    console.log('Closing side panel');
-    setSelectedUser(null);
-  };
-
+  const handleUserClick = (user) => setSelectedUser(user);
+  const handleCloseSidePanel = () => setSelectedUser(null);
   const handleUserUpdate = (updatedUser) => {
     setUsers(users.map(user => user._id === updatedUser._id ? updatedUser : user));
     setSelectedUser(updatedUser);
@@ -61,18 +51,21 @@ function AdminDashboardPage() {
   const userTypes = ['All', 'admin', 'teamleader', 'employee'];
 
   const filteredUsers = users
-    .filter(user =>
-      (selectedDepartment === 'All' || user.Department === selectedDepartment || user.department === selectedDepartment)
-    )
-    .filter(user =>
-      (selectedUserType === 'All' || user.userType === selectedUserType)
-    )
-    .filter(user =>
-      (user['First name'] && user['First name'].toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user['Last name'] && user['Last name'].toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user['Work email'] && user['Work email'].toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user['Employee Code'] && user['Employee Code'].toLowerCase().includes(searchTerm.toLowerCase()))
+  .filter(user =>
+    (selectedDepartment === 'All' || user.department === selectedDepartment)
+  )
+  .filter(user =>
+    (selectedUserType === 'All' || user.userType === selectedUserType)
+  )
+  .filter(user => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (user.name && user.name.toLowerCase().includes(searchLower)) ||
+      (user.workEmail && user.workEmail.toLowerCase().includes(searchLower)) ||
+      (user.employeeCode && user.employeeCode.toLowerCase().includes(searchLower))
     );
+  });
+
 
   const getStats = () => {
     const total = users.length;
@@ -86,12 +79,9 @@ function AdminDashboardPage() {
 
   const getUserTypeIcon = (userType) => {
     switch (userType) {
-      case 'admin':
-        return <AdminPanelSettingsIcon className="w-5 h-5 text-purple-400" />;
-      case 'teamleader':
-        return <SupervisorAccountIcon className="w-5 h-5 text-blue-400" />;
-      default:
-        return <PersonIcon className="w-5 h-5 text-emerald-400" />;
+      case 'admin': return <AdminPanelSettingsIcon className="text-purple-400" />;
+      case 'teamleader': return <SupervisorAccountIcon className="text-blue-400" />;
+      default: return <PersonIcon className="text-emerald-400" />;
     }
   };
 
@@ -105,216 +95,148 @@ function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
-      <ToastContainer theme="dark" position="top-right" />
+  <div className="min-h-screen bg-gray-100 text-gray-900">
+    <ToastContainer theme="light" position="top-right" />
 
-      <div className={`transition-all duration-300 ${selectedUser ? 'mr-[50%]' : ''}`}>
-        <div className="container mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent mb-4">
-              Admin Dashboard
-            </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Manage and monitor all users in your organization
-            </p>
-          </div>
+    <div className={`transition-all duration-300 ${selectedUser ? 'mr-[50%]' : ''}`}>
+      <div className="container mx-auto px-4 py-8">
 
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            Admin Dashboard
+          </h1>
+          <p className="text-xl text-gray-600">Manage and monitor all users and attendance</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          {[{ label: "Total Users", value: stats.total, icon: <PeopleIcon className="text-blue-600" /> },
+            { label: "Admins", value: stats.admins, icon: <AdminPanelSettingsIcon className="text-purple-600" /> },
+            { label: "Team Leaders", value: stats.teamleaders, icon: <SupervisorAccountIcon className="text-blue-600" /> },
+            { label: "Employees", value: stats.employees, icon: <PersonIcon className="text-emerald-600" /> }
+          ].map((item, idx) => (
+            <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-300 shadow-sm">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <PeopleIcon className="text-blue-400" />
-                </div>
+                <div className="p-2 bg-opacity-20 rounded-lg">{item.icon}</div>
                 <div>
-                  <p className="text-sm text-gray-400">Total Users</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-gray-500">{item.label}</p>
+                  <p className="text-2xl font-bold">{item.value}</p>
                 </div>
               </div>
             </div>
+          ))}
+        </div>
 
-            <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <AdminPanelSettingsIcon className="text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Admins</p>
-                  <p className="text-2xl font-bold text-purple-400">{stats.admins}</p>
-                </div>
-              </div>
+        {/* Filters */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-300 shadow-sm mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between">
+            <div className="flex items-center space-x-3 mb-4 lg:mb-0">
+              <FilterListIcon className="text-emerald-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
             </div>
 
-            <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <SupervisorAccountIcon className="text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Team Leaders</p>
-                  <p className="text-2xl font-bold text-blue-400">{stats.teamleaders}</p>
-                </div>
-              </div>
-            </div>
+            <Link to="/add-employee" className="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded text-white font-bold">
+              Add User
+            </Link>
 
-            <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-emerald-500/20 rounded-lg">
-                  <PersonIcon className="text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Employees</p>
-                  <p className="text-2xl font-bold text-emerald-400">{stats.employees}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border border-gray-700/50 mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-              <div className="flex items-center space-x-3">
-                <FilterListIcon className="text-emerald-400" />
-                <h3 className="text-lg font-semibold">Filters & Search</h3>
-              </div>
-              <Link to="/add-employee" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded">
-                Add User
-              </Link>
-
-              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                {/* Search */}
-                <div className="relative">
-                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    className="pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-64"
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                {/* Department Filter */}
-                <select
-                  className="bg-gray-700/50 border border-gray-600/50 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  value={selectedDepartment}
-                >
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-
-                {/* User Type Filter */}
-                <select
-                  className="bg-gray-700/50 border border-gray-600/50 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  onChange={(e) => setSelectedUserType(e.target.value)}
-                  value={selectedUserType}
-                >
-                  {userTypes.map(type => (
-                    <option key={type} value={type}>
-                      {type === 'All' ? 'All Roles' : type.charAt(0).toUpperCase() + type.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 flex space-x-4">
-           <button
-    onClick={async () => {
-      try {
-        toast.info('Preparing CSV download...');
-        await downloadAllAttendanceCSV();
-        toast.success('All attendance CSV downloaded successfully!');
-      } catch (error) {
-        console.error('Download failed:', error);
-        toast.error(error.message || 'Failed to download CSV');
-      }
-    }}
-    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 font-medium"
-  >
-     Download All Attendance CSV
-  </button>
-
-
-            {selectedUser && (
-              <button
-                onClick={() => window.open(downloadEmployeeAttendanceCSV(selectedUser._id), '_blank')}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+            <div className="flex flex-wrap gap-4 mt-4 lg:mt-0">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-white border border-gray-300 px-4 py-2 rounded text-gray-900"
+              />
+              <select
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                value={selectedDepartment}
+                className="bg-white border border-gray-300 rounded px-3 py-2 text-gray-900"
               >
-                Download {selectedUser['First name']}'s Attendance CSV
-              </button>
-            )}
+                {departments.map(dept => <option key={dept}>{dept}</option>)}
+              </select>
+              <select
+                onChange={(e) => setSelectedUserType(e.target.value)}
+                value={selectedUserType}
+                className="bg-white border border-gray-300 rounded px-3 py-2 text-gray-900"
+              >
+                {userTypes.map(type => <option key={type}>{type}</option>)}
+              </select>
+            </div>
           </div>
+        </div>
 
-          {/* Users Grid */}
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-400"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredUsers.map((user) => (
-                <div
-                  key={user._id}
-                  className={`bg-gray-800/50 backdrop-blur-lg p-6 rounded-2xl border cursor-pointer transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${selectedUser?._id === user._id
-                      ? 'border-emerald-500 bg-emerald-500/10'
-                      : 'border-gray-700/50 hover:border-emerald-400/50'
-                    }`}
-                  onClick={() => handleUserClick(user)}
-                >
+        {/* Actions */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={async () => {
+              try {
+                toast.info('Preparing download...');
+                await downloadAllAttendanceCSV();
+                toast.success('All attendance downloaded!');
+              } catch (error) {
+                toast.error('Failed to download CSV');
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+          >
+            Download All Attendance CSV
+          </button>
 
-                  <div className="flex items-center space-x-3 mb-4">
-
-                    {getUserTypeIcon(user.userType)}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold truncate">
-                        {user['First name']} {user['Last name']}
-                      </h3>
-                      <p className="text-sm text-gray-400">{user['Employee Code']}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-300 truncate">{user['Work email']}</p>
-                    <p className="text-sm text-gray-400">{user.Department || user.department}</p>
-                    <p className="text-sm text-gray-400">{user.Designation}</p>
-
-                    <div className="flex justify-between items-center mt-3">
-                      <span className={`px-2 py-1 text-xs font-medium text-white rounded-full ${getUserTypeBadge(user.userType)}`}>
-                        {user.userType || 'employee'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Click to view details
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {filteredUsers.length === 0 && !isLoading && (
-            <div className="text-center py-16">
-              <PeopleIcon style={{ fontSize: 80 }} className="text-gray-600 mb-4" />
-              <h3 className="text-2xl font-semibold text-gray-400 mb-2">No Users Found</h3>
-              <p className="text-gray-500">No users match your current search criteria.</p>
-            </div>
+          {selectedUser && (
+            <button
+              onClick={() => window.open(downloadEmployeeAttendanceCSV(selectedUser._id), '_blank')}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+            >
+              Download {selectedUser['First name']}'s Attendance
+            </button>
           )}
         </div>
-      </div>
 
-      {/* Side Panel */}
-      <UserDetailsSidePanel
-        user={selectedUser}
-        isOpen={!!selectedUser}
-        onClose={handleCloseSidePanel}
-        onUserUpdate={handleUserUpdate}
-      />
+        {/* User Cards */}
+        {isLoading ? (
+          <div className="text-center text-gray-700">Loading...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredUsers.map(user => (
+              <div
+                key={user._id}
+                onClick={() => handleUserClick(user)}
+                className="bg-white p-5 rounded-xl border border-gray-300 shadow-sm hover:border-emerald-600 cursor-pointer"
+              >
+                <div className="flex items-center space-x-3 mb-3 text-gray-900">
+                  {getUserTypeIcon(user.userType)}
+                  <div>
+                    <h3 className="font-semibold">{user.name}</h3>
+                    <p className="text-sm text-gray-500">{user.employeeCode}</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-700 mb-1">{user.workEmail}</p>
+                <p className="text-sm text-gray-500 mb-1">{user.department || user.Department}</p>
+
+                <div className="mt-4">
+                  <span className={`text-xs px-2 py-1 rounded-full ${getUserTypeBadge(user.userType)}`}>
+                    {user.userType}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  );
+
+    {/* Side Panel */}
+    <UserDetailsSidePanel
+      user={selectedUser}
+      isOpen={!!selectedUser}
+      onClose={handleCloseSidePanel}
+      onUserUpdate={handleUserUpdate}
+    />
+  </div>
+);
+
 }
 
 export default AdminDashboardPage;

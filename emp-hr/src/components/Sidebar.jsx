@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
-import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
@@ -18,12 +17,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import useLogout from '../pages/Logout';
 import Modal from './Modal';
 import useUser from '../hooks/useUser';
+import { UpdateRounded } from '@mui/icons-material';
 
 const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
   const logout = useLogout();
   const location = useLocation();
   const { user } = useUser();
-  console.log("this is user Data ",user)
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // lock body scroll when mobile drawer is open
@@ -125,8 +124,6 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
             <Item to="/my-attendance" icon={CalendarViewMonthOutlinedIcon} text="Attendance" />
             <Item to="/past-leaves" icon={HistoryOutlinedIcon} text="Past Leaves" />
             <Item to="/profile" icon={AccountCircleOutlinedIcon} text="Profile" />
-            {user?.Designation=='CSO' && <Item to="/tutorDash" icon={SatelliteAltIcon} text="Tutor Dashb" />}
-            {/* {user?.Department=='Space Education & Research' && <Item to="/tutorDash" icon={SatelliteAltIcon} text="Tutor Dashb" />} */}
           </div>
 
           {/* Team leader */}
@@ -153,6 +150,7 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
               </h3>
               <div className="space-y-1">
                 <Item to="/admin" icon={AdminPanelSettingsOutlinedIcon} text="Dashboard" hover="hover:bg-purple-100" />
+                <Item to="/update-attendance" icon={UpdateRounded} text="Update Attendance" hover="hover:bg-purple-100" />
                 <Item to="/manage-employees" icon={PeopleOutlineOutlinedIcon} text="All Users" hover="hover:bg-purple-100" />
                 <Item to="/add-employee" icon={PersonAddAltOutlinedIcon} text="Add User" hover="hover:bg-purple-100" />
                 <Item to="/all-leaves" icon={AssignmentLateOutlinedIcon} text="All Leaves" hover="hover:bg-red-100" />

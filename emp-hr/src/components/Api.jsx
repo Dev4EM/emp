@@ -1,8 +1,9 @@
 import axios from 'axios';
 
+
 // Base URL for all API requests
 const API = axios.create({
-  // baseURL: 'http://localhost:5000/api', // 🔁 change this to your backend base URL
+  // baseURL: 'http://localhost:5001/api', // 🔁 change this to your backend base URL
   //  baseURL : 'http://empeople.esromagica.in/api',
   baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
   headers: {
@@ -50,6 +51,38 @@ export const markNotificationAsRead = async (notificationId) => {
 
 export const deleteNotification = async (notificationId) => {
   return handleApiRequest(() => API.delete(`/notifications/${notificationId}`));
+};
+export const getMonthlyAttendance = async (startDate, endDate) => {
+  const response = await API.get(`/employee/attendance/history?start=${startDate}&end=${endDate}`);
+console.log(response.data)
+  return response.data.attendance;
+};
+export const fetchAddress = async (lat, lng) => {
+  try {
+    const res = await API.get(`/geocode/reverse`, {
+      params: { lat, lon: lng },
+    });
+
+    const address = res.data?.address;
+
+    if (!address) {
+      console.warn('No address returned:', res.data);
+      return 'Location not found';
+    }
+
+    return address;
+  } catch (err) {
+    console.error('Address Fetch Error:', err);
+    return 'Location not found';
+  }
+};
+
+
+export const getTodayAttendance = async () => {
+  const today = new Date().toISOString().split('T')[0];
+  const res = await getMonthlyAttendance(today, today);
+  console.log(res);
+  return res;
 };
 
 // ----------------- API FUNCTIONS ------------------
@@ -155,12 +188,9 @@ export const updateUser = async (userId, userData) => {
 
 
 // Employee APIs
-export const getMyAttendance = async () => {
-    const response = await API.get('/employee/my-attendance');
-    return response.data;
-};
-export const getLeaveBalance = async () => {
-    const response = await API.get('/employee/leave-balance');
+
+export const getLeaveBalance = async (userId) => {
+    const response = await API.get(`/user/${userId}/leave-balance`);
     return response.data;
 };
 // Change password function
@@ -168,9 +198,24 @@ export const changePassword = async (passwordData) => {
   const response = await API.put('/auth/change-password', passwordData);
   return response.data;
 };
-export const applyLeave = (leaveData) => API.post('/employee/apply-leave', leaveData);
+export const getDepartmentWeekOff = async (department) => {
+   
+  try {
+    const response = await API.get(`/weekoff/department/${department}`);
+    console.log("Weekend Department is:",response.data)
+    return response.data;
+   
+  } catch (error) {
+    console.error('Error fetching department week off:', error);
+    throw error;
+  }
+};
+
+export const applyLeave = (leaveData) => API.post('/employee/leave/apply', leaveData);
+
+
 export const getPastLeaves = async (page = 1, limit = 10) => {
-    const response = await API.get(`/employee/past-leaves?page=${page}&limit=${limit}`);
+    const response = await API.get(`/employee/leave/history?page=${page}&limit=${limit}`);
     return response.data;
 };
 export const cancelLeave = async (leaveToCancel, leaves, setLeaves, closeCancelModal, toast) => {
@@ -180,13 +225,13 @@ export const cancelLeave = async (leaveToCancel, leaves, setLeaves, closeCancelM
 }
  
 export const checkIn = async (locationData) => {
-  const response = await API.post('/employee/check-in', {
+  const response = await API.post('/employee/attendance/check-in', {
     location: locationData,
   });
   return response.data;
 };
 export const checkOut = async (locationData) => {
-  const response = await API.post('/employee/check-out', {
+  const response = await API.post('/employee/attendance/check-out', {
     location: locationData,
   });
   return response.data;
@@ -249,13 +294,28 @@ export const getAllUsers = async () => {
   const response = await API.get('/admin/all-users');
   return response.data;
 };
-
-export const updateAttendance = async (userId, date, attendanceData) => {
-  return handleApiRequest(() => API.put(`/admin/attendance/${userId}`, { date, ...attendanceData }));
+export const getAllUsersDash = async () => {
+  const response = await API.get('/admin/Dashb-all-users');
+  return response.data;
+};
+export const getAttendance = async (search, month, year) => {
+  const response  = await API.get( `/admin/attendance/all?search=${encodeURIComponent(search)}&month=${month}&year=${year}`) 
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Failed to fetch attendance');
+  }
+  return response.json();
 };
 
+export const updateAttendance = async (payload) => {
+
+  return handleApiRequest(() => API.put(`/user/attendance/update`, payload));
+};
+
+
 export const updateLeaveBalance = async (userId, leaveBalance) => {
-  return handleApiRequest(() => API.put(`/admin/leave-balance/${userId}`, { leaveBalance }));
+  return handleApiRequest(() => API.put(`/admin/attendance/leave-balance/${userId}`, { leaveBalance }));
 };
 export const assignReportingManager = async (data) => {
   const response = await API.put('/admin/assign-reporting-manager', data);
@@ -267,8 +327,8 @@ export const getUserAttendance = async (userId) => {
   return response.data;
 };
 
-export const getUserLeaveBalance = async (userId) => {
-  const response = await API.get(`/user/${userId}/leave-balance`);
+export const getUserLeaveBalance = async (user) => {
+  const response = await API.get(`/user/${user}/leave-balance`);
   return response.data;
 };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getMyAttendance } from '../components/Api';
+import { getMonthlyAttendance } from '../components/Api';
 import { toast, ToastContainer } from 'react-toastify';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -13,20 +13,39 @@ function MyAttendancePage() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  useEffect(() => {
-    const fetchAttendance = async () => {
-      try {
-        const response = await getMyAttendance();
-        setAttendance(response);
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to fetch attendance.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+ useEffect(() => {
+  const fetchAttendance = async () => {
+    setIsLoading(true);
 
-    fetchAttendance();
-  }, []);
+    // Build valid ISO strings for 1st day and last day of selected month
+   const formatDate = (date) => {
+  // Format a Date object to 'YYYY-MM-DD'
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const startDateObj = new Date(currentYear, currentMonth, 1); // 1st day of month
+const endDateObj = new Date(currentYear, currentMonth + 1, 0); // last day of month
+
+const startDate = formatDate(startDateObj); 
+const endDate = formatDate(endDateObj);    
+
+
+    try {
+      const response = await getMonthlyAttendance(startDate, endDate);
+      setAttendance(response);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to fetch attendance.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchAttendance();
+}, [currentMonth, currentYear]);
+
 
   const formatDate = (dateString) => {
     const options = { 
@@ -92,19 +111,19 @@ function MyAttendancePage() {
   const stats = getAttendanceStats();
 
   return (
-    <div className="p-8 bg-gray-900 text-white min-h-screen">
+    <div className="p-8 bg-gray-100 text-black min-h-screen">
       <ToastContainer theme="colored" />
       
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-emerald-400 mb-4">My Attendance</h1>
+          <h1 className="text-4xl font-bold text-emerald-800 mb-4">My Attendance</h1>
           
           {/* Month/Year Filter */}
           <div className="flex flex-wrap gap-4 mb-6">
             <select 
               value={currentMonth} 
               onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-              className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white"
+              className="bg-white border border-gray-600 rounded-lg px-4 py-2 text-black"
             >
               {Array.from({ length: 12 }, (_, i) => (
                 <option key={i} value={i}>
@@ -115,7 +134,7 @@ function MyAttendancePage() {
             <select 
               value={currentYear} 
               onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-              className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white"
+              className="bg-white border border-gray-600 rounded-lg px-4 py-2 text-black"
             >
               {[2023, 2024, 2025].map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -125,33 +144,33 @@ function MyAttendancePage() {
 
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <CalendarTodayIcon className="text-blue-400" />
-                <p className="text-sm text-gray-400">Total Days</p>
+                <p className="text-sm text-gray-900">Total Days</p>
               </div>
-              <p className="text-2xl font-bold">{stats.totalDays}</p>
+              <p className="text-2xl text-black font-bold">{stats.totalDays}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <WorkIcon className="text-green-400" />
-                <p className="text-sm text-gray-400">Complete Days</p>
+                <p className="text-sm text-gray-800">Complete Days</p>
               </div>
-              <p className="text-2xl font-bold text-green-400">{stats.completeDays}</p>
+              <p className="text-2xl font-bold text-black">{stats.completeDays}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <AccessTimeIcon className="text-yellow-400" />
                 <p className="text-sm text-gray-400">Incomplete Days</p>
               </div>
-              <p className="text-2xl font-bold text-yellow-400">{stats.incompleteDays}</p>
+              <p className="text-2xl font-bold text-black">{stats.incompleteDays}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
               <div className="flex items-center space-x-2 mb-2">
                 <TrendingUpIcon className="text-purple-400" />
                 <p className="text-sm text-gray-400">Avg. Hours</p>
               </div>
-              <p className="text-2xl font-bold text-purple-400">{stats.avgWorkHours}h</p>
+              <p className="text-2xl font-bold text-black">{stats.avgWorkHours}h</p>
             </div>
           </div>
         </div>
@@ -163,22 +182,22 @@ function MyAttendancePage() {
         ) : filteredAttendance.length > 0 ? (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-8">
+            <div className="hidden md:block bg-white rounded-lg border border-gray-700 overflow-hidden mb-8">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-700">
+                  <thead className="bg-white">
                     <tr>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Date</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Check In</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Check Out</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Duration</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Location</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Status</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Date</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Check In</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Check Out</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Duration</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Location</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
+                  <tbody className="divide-y divide-white">
                     {filteredAttendance.map((record, index) => (
-                      <tr key={record.date || index} className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}>
+                      <tr key={record.date || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-white'} hover:bg-gray-100 transition-colors`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <CalendarTodayIcon className="w-4 h-4 mr-2 text-emerald-400" />
@@ -207,7 +226,7 @@ function MyAttendancePage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <LocationOnIcon className="w-4 h-4 mr-2 text-purple-400" />
-                            <span className="text-sm text-gray-400 truncate max-w-xs">
+                            <span className="text-sm text-gray-900 truncate max-w-xs">
                               {record.checkInLocation?.address || 'N/A'}
                             </span>
                           </div>
@@ -276,7 +295,7 @@ function MyAttendancePage() {
         ) : (
           <div className="text-center py-12">
             <CalendarTodayIcon style={{ fontSize: 80 }} className="text-gray-600 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-400 mb-2">No Attendance Records Found</h3>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No Attendance Records Found</h3>
             <p className="text-gray-500">No attendance records found for the selected period.</p>
           </div>
         )}

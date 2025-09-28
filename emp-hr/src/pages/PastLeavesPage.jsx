@@ -105,28 +105,28 @@ function PastLeavesPage() {
   const stats = getLeaveStats();
 
   return (
-    <div className="p-8 bg-gray-900 text-white min-h-screen">
+    <div className="p-8 bg-white text-black min-h-screen">
       <ToastContainer theme="colored" />
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-emerald-400 mb-4">My Past Leaves</h1>
+          <h1 className="text-4xl font-bold text-emerald-900 mb-4">My Past Leaves</h1>
 
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400">Total Applications</p>
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
+              <p className="text-sm text-gray-800">Total Applications</p>
               <p className="text-2xl font-bold">{leaves.length}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400">Approved</p>
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
+              <p className="text-sm text-gray-800">Approved</p>
               <p className="text-2xl font-bold text-green-400">{stats.approved}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400">Pending</p>
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
+              <p className="text-sm text-gray-800">Pending</p>
               <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
             </div>
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400">Days Taken</p>
+            <div className="bg-white p-4 rounded-lg border border-gray-700">
+              <p className="text-sm text-gray-800">Days Taken</p>
               <p className="text-2xl font-bold text-blue-400">{stats.totalDays}</p>
             </div>
           </div>
@@ -139,23 +139,23 @@ function PastLeavesPage() {
         ) : leaves.length > 0 ? (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-8">
+            <div className="hidden md:block bg-white rounded-lg border border-gray-700 overflow-hidden mb-8">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-700">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Leave Date</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Type</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Duration</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Status</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Applied On</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Reason</th>
-                      <th className="px-6 py-4 text-sm font-semibold text-gray-300">Cancel Leave</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Leave Date</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Type</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Duration</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Status</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Applied On</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Reason</th>
+                      <th className="px-6 py-4 text-sm font-semibold text-gray-900">Cancel Leave</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
+                  <tbody className="divide-y divide-white">
                     {leaves.map((leave, index) => (
-                      <tr key={leave._id} className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}>
+                      <tr key={leave._id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-150'} hover:bg-gray-200 transition-colors`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <CalendarTodayIcon className="w-4 h-4 mr-2 text-emerald-400" />
@@ -178,11 +178,11 @@ function PastLeavesPage() {
                             {leave.status?.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
+                        <td className="px-6 py-4 text-sm text-gray-800">
                           {leave.appliedOn ? formatAppliedDate(leave.appliedOn) : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm text-gray-300 max-w-xs truncate" title={leave.reason}>
+                          <p className="text-sm text-gray-800 max-w-xs truncate" title={leave.reason}>
                             {leave.reason || 'No reason provided'}
                           </p>
                         </td>

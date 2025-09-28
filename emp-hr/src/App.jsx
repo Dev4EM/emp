@@ -20,8 +20,7 @@ import ManageEmployeesPage from './pages/ManageEmployeesPage.jsx';
 import TeamAttendancePage from './pages/TeamAttendancePage';
 import ManageAppPage from './pages/ManageAppPage';
 import AddUserPage from './pages/AddUserPage';
-import TutorDashboard from './pages/TutorDashboard.jsx';
-import Maintainance from './pages/Maintainance.jsx';
+import UpdateAttendance from './pages/UpdateAttendance.jsx';
  
 // A component to conditionally render the layout
 const AppContent = () => {
@@ -40,8 +39,7 @@ const AppContent = () => {
         <Layout>
           <Routes>
             <Route element={<AuthWrapper />}>
-              <Route path="/" element={<Maintainance/>} />
-              {/* <Route path="/" element={<HomePage />} /> */}
+              <Route path="/" element={<HomePage />} />
               <Route path="/applyLeave" element={<ApplyLeavePage />} />
               <Route path="/team-members" element={<TeamMembersPage />} />
               <Route path="/pending-leaves" element={<PendingLeavesPage />} />
@@ -55,10 +53,11 @@ const AppContent = () => {
               <Route path="/manage-employees" element={<ManageEmployeesPage />} />
               <Route path="/team-attendance" element={<TeamAttendancePage />} />
               <Route path="/manage-app" element={<ManageAppPage />} />
-              <Route path="/tutordash" element={<TutorDashboard />} />
+              <Route path="/update-attendance" element={<UpdateAttendance />} />
             </Route>
 
           </Routes>
+          <p>ESROMAGICA SPACETECH PVT LTD</p>
         </Layout>
                 </SocketProvider>
 

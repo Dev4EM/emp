@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const Leave = require('../models/Leave');
+const Attendance = require('../models/Attendance');
 
 // Middleware to check if user is a team leader or admin
 const checkTeamLeader = (req, res, next) => {
@@ -62,6 +64,9 @@ const createLeaveDecisionNotifications = async (employee, leave, decision, manag
 };
 
 // PUT /api/teamleader/approve-leave - Updated with notifications
+
+// PUT /api/teamleader/reject-leave - Updated with notifications
+// PUT /api/teamleader/approve-leave
 router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId } = req.body;
 
@@ -72,49 +77,51 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
-    
-    const employee = await User.findOne({ 
-      _id: employeeId, 
-      "Reporting manager": { 
-        $regex: new RegExp(`^${managerName}$`, 'i') 
-      } 
+
+    const employee = await User.findOne({
+      _id: employeeId,
+      "Reporting manager": {
+        $regex: new RegExp(`^${managerName}$`, 'i')
+      }
     });
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
     }
 
-    const leave = employee.leaves.id(leaveId);
+    const leave = await Leave.findById(leaveId);
     if (!leave) {
       return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    // Optional safety check
+    if (leave.employeeId.toString() !== employee._id.toString()) {
+      return res.status(403).json({ message: 'Leave does not belong to the specified employee' });
     }
 
     if (leave.status !== 'pending') {
       return res.status(400).json({ message: 'Leave request is not pending' });
     }
 
-    // Check and update leave balance
     if (leave.type === 'paid') {
       if (employee.paidLeaveBalance < leave.duration) {
-        return res.status(400).json({ 
-          message: `Cannot approve. Employee has insufficient paid leave balance. Available: ${employee.paidLeaveBalance} days` 
+        return res.status(400).json({
+          message: `Cannot approve. Employee has insufficient paid leave balance. Available: ${employee.paidLeaveBalance} days`
         });
       }
       employee.paidLeaveBalance -= leave.duration;
+      await employee.save();
     }
 
-    // Update leave status
     leave.status = 'approved';
     leave.approvedBy = req.user.id;
     leave.approvedOn = new Date();
+    await leave.save();
 
-    await employee.save();
-
-    // 🔔 SEND NOTIFICATION TO EMPLOYEE
     const io = req.app.get('socketio');
     await createLeaveDecisionNotifications(employee, leave, 'approved', managerName, '', io);
 
-    res.json({ 
+    res.json({
       message: 'Leave request approved successfully and employee has been notified',
       leave: {
         leaveId: leave._id,
@@ -134,7 +141,8 @@ router.put('/approve-leave', auth, checkTeamLeader, async (req, res) => {
   }
 });
 
-// PUT /api/teamleader/reject-leave - Updated with notifications
+
+// PUT /api/teamleader/reject-leave
 router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
   const { employeeId, leaveId, rejectionReason } = req.body;
 
@@ -157,7 +165,8 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       return res.status(404).json({ message: 'Employee not found or not under your management' });
     }
 
-    const leave = employee.leaves.id(leaveId);
+    const leave = await Leave.findById(leaveId);
+
     if (!leave) {
       return res.status(404).json({ message: 'Leave request not found' });
     }
@@ -166,7 +175,6 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       return res.status(400).json({ message: 'Leave request is not pending' });
     }
 
-    // Update leave status
     leave.status = 'rejected';
     leave.approvedBy = req.user.id;
     leave.approvedOn = new Date();
@@ -174,7 +182,7 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
       leave.rejectionReason = rejectionReason;
     }
 
-    await employee.save();
+    await leave.save();
 
     // 🔔 SEND NOTIFICATION TO EMPLOYEE
     const io = req.app.get('socketio');
@@ -200,6 +208,7 @@ router.put('/reject-leave', auth, checkTeamLeader, async (req, res) => {
     res.status(500).json({ message: 'Server Error' });
   }
 });
+
 
 // POST /api/teamleader/add-employee
 router.post('/add-employee', auth, checkTeamLeader, async (req, res) => {
@@ -245,47 +254,54 @@ router.get('/team-members', auth, checkTeamLeader, async (req, res) => {
 // GET /api/teamleader/pending-leaves - Updated to work with reporting manager names
 router.get('/pending-leaves', auth, checkTeamLeader, async (req, res) => {
   try {
-    // Get the current user's full name
     const currentUser = await User.findById(req.user.id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
-    
-    // Find team members by reporting manager name
+
+    // Find team members under this manager
     const teamMembers = await User.find({ 
-      "Reporting manager": { 
-        $regex: new RegExp(`^${managerName}$`, 'i') 
-      } 
+      "Reporting manager": { $regex: new RegExp(`^${managerName}$`, 'i') } 
+    }).select({
+  _id: 1,
+  "First name": 1,
+  "Last name": 1,
+  "Work email": 1,
+  "Employee Code": 1
+});
+
+
+    const teamMemberIds = teamMembers.map(member => member._id);
+
+    // Get pending leaves for these users
+    const pendingLeaves = await Leave.find({
+      employeeId: { $in: teamMemberIds },
+      status: 'pending'
+    }).sort({ appliedOn: -1 }).lean();
+
+    // Map leave data with employee info
+    const leavesWithEmployeeData = pendingLeaves.map(leave => {
+      const emp = teamMembers.find(member => member._id.equals(leave.employeeId));
+      return {
+        leaveId: leave._id,
+        employeeId: leave.employeeId,
+         employeeName: emp ? `${emp["First name"]} ${emp["Last name"]}` : '',
+        employeeEmail: emp ? emp["Work email"] : '',
+        employeeCode: emp ? emp["Employee Code"] : '',
+        date: leave.date,
+        type: leave.type,
+        duration: leave.duration,
+        reason: leave.reason,
+        appliedOn: leave.appliedOn,
+        status: leave.status
+      };
     });
-    
-    const pendingLeaves = [];
-    teamMembers.forEach(member => {
-      member.leaves.forEach(leave => {
-        if (leave.status === 'pending') {
-          pendingLeaves.push({
-            leaveId: leave._id,
-            employeeId: member._id,
-            employeeName: `${member["First name"]} ${member["Last name"]}`,
-            employeeEmail: member["Work email"],
-            employeeCode: member["Employee Code"],
-            date: leave.date,
-            type: leave.type,
-            duration: leave.duration,
-            reason: leave.reason,
-            appliedOn: leave.appliedOn,
-            status: leave.status
-          });
-        }
-      });
-    });
-    
-    // Sort by applied date (newest first)
-    pendingLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
-    
-    res.json(pendingLeaves);
+
+    res.json(leavesWithEmployeeData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
+
 
  
 
@@ -294,19 +310,58 @@ router.get('/team-attendance', auth, checkTeamLeader, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
     const managerName = `${currentUser["First name"]} ${currentUser["Last name"]}`.trim();
-    
-    const teamMembers = await User.find({ 
-      "Reporting manager": { 
-        $regex: new RegExp(`^${managerName}$`, 'i') 
-      } 
-    }).select('["First name"] ["Last name"] ["Employee Code"] attendance');
-    
-    res.json(teamMembers);
+
+    // 1. Get team members reporting to the current manager
+    const teamMembers = await User.find({
+      "Reporting manager": { $regex: new RegExp(`^${managerName}$`, 'i') }
+    }).select({
+      _id: 1,
+      "First name": 1,
+      "Last name": 1,
+      "Employee Code": 1,
+      "Work email": 1
+    });
+
+    if (teamMembers.length === 0) {
+      return res.json([]); // No team members found
+    }
+
+    const teamMemberIds = teamMembers.map(member => member._id);
+
+    // 2. Get attendance records for those team members
+    const attendanceRecords = await Attendance.find({
+      employeeId: { $in: teamMemberIds }
+    }).sort({ date: -1 }).lean();
+
+    // 3. Map attendance records to user details
+    const attendanceWithUser = attendanceRecords.map(record => {
+      const user = teamMembers.find(u => u._id.equals(record.employeeId));
+      return {
+        attendanceId: record._id,
+        employeeId: record.employeeId,
+        employeeName: user ? `${user["First name"]} ${user["Last name"]}` : '',
+        employeeCode: user ? user["Employee Code"] : '',
+        employeeEmail: user ? user["Work email"] : '',
+        date: record.date,
+        checkIn: record.checkIn,
+        checkInLocation: record.checkInLocation,
+        checkOut: record.checkOut,
+        checkOutLocation: record.checkOutLocation,
+        remarks: record.remarks,
+        updatedCheckIn: record.updatedCheckIn,
+        updatedCheckOut: record.updatedCheckOut,
+        reason: record.reason,
+        updatedAt: record.updatedAt
+      };
+    });
+
+    res.json(attendanceWithUser);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });
   }
 });
+
 
 // GET /api/teamleader/department-leaves
 // DESC: Get all leaves from the team leader's department
@@ -319,32 +374,36 @@ router.get('/department-leaves', auth, checkTeamLeader, async (req, res) => {
       return res.status(400).json({ message: 'You are not assigned to a department.' });
     }
 
-    const usersInDepartment = await User.find({ Department: department });
-    console.log(department, usersInDepartment.length);
-    
-    const departmentLeaves = [];
-    usersInDepartment.forEach(user => {
-      user.leaves.forEach(leave => {
-        departmentLeaves.push({
-          leaveId: leave._id,
-          employeeId: user._id,
-          employeeName: `${user["First name"]} ${user["Last name"]}`,
-          employeeEmail: user["Work email"],
-          employeeCode: user["Employee Code"],
-          date: leave.date,
-          type: leave.type,
-          duration: leave.duration,
-          reason: leave.reason,
-          appliedOn: leave.appliedOn,
-          status: leave.status,
-        });
-      });
+    const usersInDepartment = await User.find({ Department: department }).select({
+  _id: 1,
+  "First name": 1,
+  "Last name": 1,
+  "Work email": 1,
+  "Employee Code": 1
+});
+;
+    const userIds = usersInDepartment.map(u => u._id);
+
+    const leaves = await Leave.find({ employeeId: { $in: userIds } }).sort({ appliedOn: -1 }).lean();
+
+    const leavesWithUser = leaves.map(leave => {
+      const user = usersInDepartment.find(u => u._id.equals(leave.employeeId));
+      return {
+        leaveId: leave._id,
+        employeeId: leave.employeeId,
+        employeeName: user ? `${user["First name"]} ${user["Last name"]}` : '',
+        employeeEmail: user ? user["Work email"] : '',
+        employeeCode: user ? user["Employee Code"] : '',
+        date: leave.date,
+        type: leave.type,
+        duration: leave.duration,
+        reason: leave.reason,
+        appliedOn: leave.appliedOn,
+        status: leave.status,
+      };
     });
 
-    // Sort by applied date (newest first)
-    departmentLeaves.sort((a, b) => new Date(b.appliedOn) - new Date(a.appliedOn));
-
-    res.json(departmentLeaves);
+    res.json(leavesWithUser);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server Error' });

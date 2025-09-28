@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import SpeedIcon from '@mui/icons-material/Speed';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AttendCalen from '../components/AttendCalen';
-import { checkIn, checkOut, getUser } from '../components/Api';
-import CalendarMonthView from '../components/CalendarMonthView';
-
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useGeolocated } from 'react-geolocated';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import CalendarMonthView from '../components/CalendarMonthView';
+import {
+  checkIn,
+  checkOut,
+  getUser,
+  getTodayAttendance,
+  fetchAddress,
+  getMonthlyAttendance,
+  getDepartmentWeekOff,
+  getUserLeaveBalance,
+} from '../components/Api';
 
 function HomePage() {
   const [user, setUser] = useState(null);
@@ -25,32 +29,128 @@ function HomePage() {
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-
+  const [attendanceList, setAttendanceList] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDateRecord, setSelectedDateRecord] = useState(null);
+  const [departmentWeekOffDays, setDepartmentWeekOffDays] = useState([]);
+const [leaveBalance, setLeaveBalance] = useState('');
   const { coords, isGeolocationAvailable, isGeolocationEnabled } = useGeolocated({
     positionOptions: { enableHighAccuracy: true },
     userDecisionTimeout: 5000,
   });
 
+  // Map weekday names to numbers for JS Date.getDay()
+
+  // Updates current time every second
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const extractTodayAttendance = (attendanceList) => {
-    const today = new Date();
-    const todayUTCString = today.toISOString().split('T')[0];
+  // Fetch user once on mount
+  useEffect(() => {
+  const fetchUserAndBalance = async () => {
+    try {
+      const userResponse = await getUser();
+      const userId = userResponse._id;
+      const balanceResponse = await getUserLeaveBalance(userId);
+
+      if (balanceResponse && typeof balanceResponse.remainingPaidLeave === 'number') {
+        setLeaveBalance(balanceResponse.remainingPaidLeave);
+      } else {
+        setLeaveBalance(0); // fallback
+        console.warn('Unexpected leave balance response:', balanceResponse);
+      }
+    } catch (err) {
+      console.error('Leave balance fetch error:', err);
+      toast.error(err.response?.data?.message || 'Failed to fetch user or leave balance.');
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  fetchUserAndBalance();
+  fetchUser();
+}, []);
+
+
+  // Fetch attendance list for current month on mount
+  useEffect(() => {
+    fetchUser();
+
+    const getCurrentMonthDateRange = () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
+      return { start, end };
+    };
+
+    const fetchAttendance = async () => {
+      try {
+        const { start, end } = getCurrentMonthDateRange();
+        const attendance = await getMonthlyAttendance(start, end);
+        
+        setAttendanceList(attendance || []);
+      } catch (error) {
+        
+        toast.error('Failed to load attendance');
+      }
+    };
+
+    fetchAttendance();
+  }, []);
+  const fetchUser = async () => {
+    try {
+      const userData = await getUser();
+      setUser(userData);
     
-    return attendanceList.find((entry) => {
-      if (!entry.date) return false;
-      const entryDate = new Date(entry.date);
-      const entryDateUTCString = entryDate.toISOString().split('T')[0];
-      return entryDateUTCString === todayUTCString;
-    });
+
+      // Fetch department week off if department exists
+      if (userData?.Department) {
+        try {
+          const deptWeekOff = await getDepartmentWeekOff(userData.Department);
+          // Convert week off days strings to numbers for calendar
+         
+          setDepartmentWeekOffDays(deptWeekOff.weekOffDays);
+        
+        } catch (err) {
+          console.error('Failed to fetch department week off', err);
+          toast.error("Your Department Not found! please contact With IT Department")
+        }
+      }
+
+      // Fetch today's attendance
+      const todayAttendance = await getTodayAttendance();
+      if (Array.isArray(todayAttendance) && todayAttendance.length > 0) {
+        const record = todayAttendance[0];
+
+        if (record.checkIn) {
+          setCheckInTime(record.checkIn);
+          setHasCheckedIn(true);
+          setCheckInAddress(record.checkInLocation?.address || 'N/A');
+        }
+
+        if (record.checkOut) {
+          setCheckOutTime(record.checkOut);
+          setHasCheckedOut(true);
+          setCheckOutAddress(record.checkOutLocation?.address || 'N/A');
+        }
+      }
+    } catch (err) {
+      console.error('Fetch Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to fetch data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatTime = (isoTime) => {
     if (!isoTime) return 'N/A';
-    return new Date(isoTime).toLocaleTimeString('en-IN', {
+    return new Date(isoTime).toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
@@ -60,60 +160,51 @@ function HomePage() {
   const calculateWorkDuration = (checkInTime, checkOutTime) => {
     if (!checkInTime || !checkOutTime) return null;
     const diffMs = new Date(checkOutTime) - new Date(checkInTime);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffMinutes = Math.floor((diffMs % 3600000) / 60000);
-    return `${diffHours}h ${diffMinutes}m`;
-  };
-
-  const fetchAddress = async (lat, lng) => {
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
-      const data = await response.json();
-      return data.display_name || 'Address not found';
-    } catch (error) {
-      console.error('Failed to fetch address:', error);
-      return 'Address not found';
-    }
-  };
-
-  const fetchUser = async () => {
-    try {
-      const userData = await getUser();
-      setUser(userData);
-      const todayAttendance = extractTodayAttendance(userData.attendance || []);
-      if (todayAttendance?.checkIn) {
-        setCheckInTime(todayAttendance.checkIn);
-        setHasCheckedIn(true);
-        setCheckInAddress(todayAttendance.checkInLocation?.address || 'Address not available');
-      }
-      if (todayAttendance?.checkOut) {
-        setCheckOutTime(todayAttendance.checkOut);
-        setHasCheckedOut(true);
-        setCheckOutAddress(todayAttendance.checkOutLocation?.address || 'Address not available');
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error fetching user data.');
-    } finally {
-      setLoading(false);
-    }
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    return `${hours}h ${minutes}m`;
   };
 
   const handleCheckIn = async () => {
     if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
-      toast.error('Please enable location services to check in.');
+      toast.error('Location is required to check in.');
+      return;
+    }
+
+    if (hasCheckedIn) {
+      toast.info('You have already checked in.');
       return;
     }
     setIsProcessing(true);
+
     try {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
+
+      if (!address || address === 'Location not found') {
+        toast.error('Location Not Found! Please Refresh Page!');
+        return;
+      }
       const response = await checkIn({ lat: latitude, lng: longitude, address });
-      setCheckInTime(response.attendance.checkIn);
-      setHasCheckedIn(true);
-      setCheckInAddress(address);
-      toast.success(response.message);
+      toast.success(response.message || 'Checked in successfully!');
+      await fetchUser();
+
+      // Refresh attendance list for calendar update
+      const { start, end } = (() => {
+        const now = new Date();
+        const s = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString()
+          .split('T')[0];
+        const e = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+          .toISOString()
+          .split('T')[0];
+        return { start: s, end: e };
+      })();
+      const updated = await getMonthlyAttendance(start, end);
+      setAttendanceList(updated || []);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Check-in failed.');
+      console.error('Check-in error:', err);
+      toast.error(err?.response?.data?.message || 'Check-in failed.');
     } finally {
       setIsProcessing(false);
     }
@@ -121,7 +212,7 @@ function HomePage() {
 
   const handleCheckOut = async () => {
     if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
-      toast.error('Please enable location services to check out.');
+      toast.error('Location is required to check out.');
       return;
     }
     setIsProcessing(true);
@@ -129,137 +220,202 @@ function HomePage() {
       const { latitude, longitude } = coords;
       const address = await fetchAddress(latitude, longitude);
       const response = await checkOut({ lat: latitude, lng: longitude, address });
-      setCheckOutTime(new Date().toISOString());
-      setHasCheckedOut(true);
+      const nowIso = new Date().toISOString();
+      setCheckOutTime(nowIso);
       setCheckOutAddress(address);
-      toast.success(response.message);
+      setHasCheckedOut(true);
+      toast.success(response.message || 'Checked out successfully!');
+
+      // Refresh attendance list
+      const { start, end } = (() => {
+        const now = new Date();
+        const s = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString()
+          .split('T')[0];
+        const e = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+          .toISOString()
+          .split('T')[0];
+        return { start: s, end: e };
+      })();
+      const updated = await getMonthlyAttendance(start, end);
+      setAttendanceList(updated || []);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Check-out failed.');
+      console.error('Check-out error:', err);
+      toast.error(err?.response?.data?.message || 'Check-out failed.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  useEffect(() => {
-    fetchUser();
-  }, []);
+  const ActionButton = () => {
+    if (!hasCheckedIn) {
+      return (
+        <button
+          onClick={handleCheckIn}
+          disabled={isProcessing}
+          className={`w-full py-3 px-6 rounded text-white ${
+            isProcessing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {isProcessing ? (
+            'Checking in...'
+          ) : (
+            <>
+              <LoginOutlinedIcon className="mr-2" /> Check In
+            </>
+          )}
+        </button>
+      );
+    } else if (!hasCheckedOut) {
+      return (
+        <button
+          onClick={handleCheckOut}
+          disabled={isProcessing}
+          className={`w-full py-3 px-6 rounded text-white ${
+            isProcessing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {isProcessing ? (
+            'Checking out...'
+          ) : (
+            <>
+              <LogoutOutlinedIcon className="mr-2" /> Check Out
+            </>
+          )}
+        </button>
+      );
+    } else {
+      return (
+        <div className="w-full bg-green-500 text-white py-3 px-3 rounded flex justify-center items-center">
+          <EventAvailableIcon className="mr-2" /> Day Completed
+        </div>
+      );
+    }
+  };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <div className="h-screen flex justify-center items-center">Loading...</div>;
   }
 
   const workDuration = calculateWorkDuration(checkInTime, checkOutTime);
 
-  const ActionButton = () => {
-    if (!hasCheckedIn) {
-      return (
-        <button onClick={handleCheckIn} disabled={isProcessing} className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center disabled:bg-blue-400">
-          {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <><LoginOutlinedIcon className="mr-2" /> Check In</>}
-        </button>
-      );
-    }
-    if (!hasCheckedOut) {
-      return (
-        <button onClick={handleCheckOut} disabled={isProcessing} className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center disabled:bg-blue-400">
-          {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <><LogoutOutlinedIcon className="mr-2" /> Check Out</>}
-        </button>
-      );
-    }
-    return (
-      <div className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center">
-        <EventAvailableIcon className="mr-2" /> Day Complete
-      </div>
-    );
-  };
-
-  const InfoCard = ({ icon, title, time, address }) => (
-    <div className="bg-white p-4 rounded-lg shadow-sm">
-      <div className="flex items-start space-x-4">
-        <div className="bg-blue-100 text-blue-600 p-3 rounded-lg">{icon}</div>
-        <div>
-          <p className="text-slate-600 text-sm">{title}</p>
-          <p className="text-slate-800 font-bold text-lg">{time}</p>
-          {address && 
-            <div className="flex items-start justify-start text-xs text-slate-500 mt-1">
-              <LocationOnIcon style={{ fontSize: '0.875rem' }} className="mr-1 mt-0.5"/>
-              <span className="truncate max-w-[150px]">{address}</span>
-            </div>
-          }
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <>
-      <ToastContainer theme="light" position="top-right" autoClose={3000} hideProgressBar={false} />
-      <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-800">Welcome, {user?.["First name"] || 'User'}!</h1>
-            <p className="text-slate-600 mt-1">
-              {currentTime.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-          </header>
+      <ToastContainer />
+      <div className="min-h-screen p-2 bg-gray-50">
+        <h1 className="text-2xl bg-white p-3 mb-4">
+          Welcome,{' '}
+          <span className="font-bold">{user?.['First name'] || 'Employee'}</span> ! May your
+          starshine guide you to a stellar day !
+        </h1>
+        <div className="bg-white p-5 rounded shadow-md mb-6">
+          <div className="flex justify-between items-center mb-4 flex-col md:flex-row">
+            <div>
+              <p className="text-sm text-gray-500">Current Time</p>
+              <p className="text-2xl font-bold">{formatTime(currentTime)}</p>
+            </div>
+            <div className="w-48">
+              <ActionButton />
+            </div>
+          </div>
 
-          <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="text-center md:text-left">
-                  <p className="text-slate-600">Current Time</p>
-                  <p className="text-4xl font-bold text-slate-800">{currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+          {hasCheckedIn && (
+            <div className="max-w-full justify-between gap-5 flex flex-col md:flex-row">
+              {/* Check-In */}
+              <div className="bg-gradient-to-r from-blue-50 via-white to-blue-50 rounded-lg shadow-md p-6 flex flex-col md:flex-row items-start">
+                <div className="p-3 h-12 w-12 rounded-full bg-blue-100">
+                  <LoginOutlinedIcon style={{ fontSize: 28, color: '#2563EB' }} />
                 </div>
-                <div className="w-full md:w-48">
-                  <ActionButton />
+                <div className="ml-4 flex-1 flex flex-col items-start">
+                  <h4 className="text-lg font-semibold text-blue-700">Check In</h4>
+                  <p className="mt-1 text-2xl font-bold text-gray-900">{formatTime(checkInTime)}</p>
+                  <p className="mt-1 text-gray-600 flex items-center text-start w-full max-w-[300px]">
+                    {checkInAddress.slice(0, 60)}
+                  </p>
                 </div>
               </div>
 
-              {(hasCheckedIn || hasCheckedOut) && (
-                <div className="grid grid-cols-1 md:grid-cols-2  gap-6">
-                  {hasCheckedIn && <InfoCard icon={<LoginOutlinedIcon />} title="Checked  In" time={formatTime(checkInTime)} address={checkInAddress} />}
-                  {hasCheckedOut && <InfoCard icon={<LogoutOutlinedIcon />} title="Checked Out" time={formatTime(checkOutTime)} address={checkOutAddress} />}
-                  {workDuration && <InfoCard icon={<SpeedIcon />} title="Work Duration" time={workDuration} />}
+              {/* Check-Out */}
+              {hasCheckedOut && (
+                <div className="bg-gradient-to-r from-green-50 via-white to-green-50 rounded-lg shadow-md p-6 flex flex-col md:flex-row flex-start">
+                  <div className="p-3 pb-2 h-12 w-12 rounded-full bg-green-100">
+                    <LogoutOutlinedIcon style={{ fontSize: 28, color: '#16A34A' }} />
+                  </div>
+                  <div className="ml-4 flex flex-col flex-1 items-start">
+                    <h4 className="text-lg font-semibold text-green-700">Check Out</h4>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">{formatTime(checkOutTime)}</p>
+                    <p className="mt-1 text-gray-600 flex text-start items-start max-w-[300px]">
+                      {checkOutAddress.slice(0, 60) || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {hasCheckedOut && (
+                <div className="bg-gradient-to-r from-yellow-50 via-white to-yellow-50 rounded-lg shadow-md p-6 flex flex-col items-start">
+                  <div className="flex items-start">
+                    <div className="p-3 pb-3 h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                      <SpeedIcon style={{ fontSize: 28, color: '#D97706' }} />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <h4 className="text-lg font-semibold text-yellow-700">Total Hours</h4>
+                      <p className="mt-1 text-2xl font-bold text-gray-900 max-w-[300px]">
+                        {hasCheckedOut ? workDuration : '—'}
+                      </p>
+                      <span className="text-gray-400 text-sm">Since your check‑in & check‑out</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+        </div>
+        <div className="flex flex-col md:flex-row justify-between">
+          <div className="bg-white p-4 max-w-[1000px] m-2 w-full rounded shadow-md">
+            <h2 className="text-lg font-bold mb-4">Attendance Calendar</h2>
+            <CalendarMonthView
+              attendance={attendanceList}
+             weekOffs={departmentWeekOffDays}
+              onDaySelect={(date) => {
+                const clickedDate = new Date(date).toISOString().split('T')[0];
+                const record = attendanceList.find((entry) => {
+                  const entryDate = new Date(entry.date).toISOString().split('T')[0];
+                  return entryDate === clickedDate;
+                });
 
-            <aside className="space-y-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-4">Quick Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Attendance This Month</span>
-                    <span className="font-bold text-slate-800">{user?.attendance?.length || 0} days</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600 text-sm">Paid Leave Balance</span>
-                    <span className="font-bold text-slate-800">{user?.paidLeaveBalance || 0}</span>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </main>
+                setSelectedDate(new Date(date));
+                setSelectedDateRecord(record || null);
 
-         
-<section className="mt-8">
-  <div className="bg-white p-6 rounded-lg shadow-sm">
-    <h2 className="text-xl font-bold text-slate-800 mb-4">Attendance Calendar</h2>
-    <CalendarMonthView
-      attendance={user?.attendance || []}
-      onDaySelect={(date, record) => {
-        // Optional: show a toast or open a modal with full day details
-        // Example:
-        // toast.info(record ? `In: ${record.checkIn}\nOut: ${record.checkOut || 'N/A'}` : 'No attendance record');
-      }}
-    />
-  </div>
-</section>
-
+                if (record) {
+                  toast.info(
+                    `Date: ${clickedDate}\nCheck-In: ${
+                      record.checkIn ? new Date(record.checkIn).toLocaleTimeString() : 'N/A'
+                    }\nCheck-Out: ${
+                      record.checkOut ? new Date(record.checkOut).toLocaleTimeString() : 'N/A'
+                    }`,
+                    { autoClose: 5000 }
+                  );
+                } else {
+                  toast.info(`No attendance record for ${clickedDate}`, { autoClose: 3000 });
+                }
+              }}
+            />
+          </div>
+          {/*  Total Attendance */}
+          <div className="bg-white p-4 max-w-[380px] m-2 w-full rounded shadow-md">
+            <h2 className="text-lg font-bold mb-4">Total Attendance</h2>
+            <div className="flex flex-row items-justify">
+            <p className="text-center flex flex-col border p-3 rounded-lg m-2">
+           <span className='text-5xl font-bold'> {attendanceList.length}</span>
+           <span className='text-xs'> Total Attendance For Month</span>   
+            </p>
+             <div className="flex flex-row items-justify">
+             <p className="text-center flex flex-col border p-3 m-2 rounded-lg ">
+            <span className='text-5xl font-bold' >{leaveBalance}</span>  
+            <span className='text-xs'>Total Leave Balance</span>
+            </p>
+            </div>
+           </div>
+          </div>
         </div>
       </div>
     </>

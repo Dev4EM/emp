@@ -3,9 +3,7 @@ import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonIcon from '@mui/icons-material/Person';
-import EmailIcon from '@mui/icons-material/Email';
-import PhoneIcon from '@mui/icons-material/Phone';
-import WorkIcon from '@mui/icons-material/Work';
+import { shifts, getAttendanceStatus } from './shifts';
 import BusinessIcon from '@mui/icons-material/Business';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -30,6 +28,7 @@ function UserDetailsSidePanel({ user, isOpen, onClose, onUserUpdate }) {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLeaveBalanceModalOpen, setIsLeaveBalanceModalOpen] = useState(false);
+  
 
   useEffect(() => {
     const handleEscape = (event) => {
@@ -197,374 +196,306 @@ const handleDownloadCSV = async () => {
   
 
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-black transition-opacity duration-300 z-40 ${
-          isOpen ? 'opacity-50' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-      />
-      
-      {/* Side Panel - 50% width */}
-      <div 
-        className={`fixed top-0 right-0 h-full w-1/2 bg-gray-800 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-900/50">
-            <h2 className="text-2xl font-bold text-white">Employee Details</h2>
-            <div className="flex items-center gap-3">
-              {/* Download Button */}
-              <button
-                onClick={handleDownloadCSV}
-                disabled={downloadLoading}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                  downloadLoading 
-                    ? 'bg-gray-600 cursor-not-allowed text-gray-300' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-              >
-                <DownloadIcon className="w-4 h-4" />
-                {downloadLoading ? 'Downloading...' : 'Download CSV'}
-              </button>
-              
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <CloseIcon className="text-gray-400 hover:text-white" />
-              </button>
-            </div>
+   <div>
+    {/* Backdrop */}
+    <div 
+      className={`fixed inset-0 bg-gray-100 transition-opacity duration-300 z-40 ${
+        isOpen ? 'opacity-50' : 'opacity-0 pointer-events-none'
+      }`}
+      onClick={onClose}
+    />
+    
+    {/* Side Panel - 50% width */}
+    <div 
+      className={`fixed top-0 right-0 h-full w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-300 bg-gray-50">
+          <h2 className="text-2xl font-bold text-gray-900">Employee Details</h2>
+          <div className="flex items-center gap-3">
+            {/* Download Button */}
+            <button
+              onClick={handleDownloadCSV}
+              disabled={downloadLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                downloadLoading 
+                  ? 'bg-gray-300 cursor-not-allowed text-gray-500' 
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              <DownloadIcon className="w-4 h-4" />
+              {downloadLoading ? 'Downloading...' : 'Download CSV'}
+            </button>
+            
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <CloseIcon className="text-gray-500 hover:text-gray-900" />
+            </button>
           </div>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* User Profile */}
-              <div className="text-center bg-gray-700/30 rounded-xl p-6">
-                <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                  {getUserTypeIcon(user.userType)}
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">
-                  {`${user.Prefix || ''} ${user["First name"] || ''} ${user["Last name"] || ''}`.trim()}
-                </h3>
-                <span className={`px-3 py-1 text-sm font-medium text-white rounded-full ${getUserTypeBadge(user.userType)}`}>
-                  {user.userType || 'employee'}
-                </span>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className="p-6 space-y-6">
+            {/* User Profile */}
+            <div className="text-center bg-white rounded-xl p-6 shadow">
+              <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                {getUserTypeIcon(user.userType)}
               </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {`${user.Prefix || ''} ${user.name}`.trim()}
+              </h3>
+              <span className={`px-3 py-1 text-sm font-medium text-black rounded-full ${getUserTypeBadge(user.userType)}`}>
+                {user.userType || 'employee'}
+              </span>
+            </div>
 
-              {/* Quick Stats Grid */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-emerald-500/20 rounded-xl p-4 text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <p className="text-2xl font-bold text-emerald-400">{user.paidLeaveBalance || 0}</p>
-                    <button onClick={openLeaveBalanceModal} className="text-emerald-400 hover:text-emerald-200">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" />
-                      </svg>
-                    </button>
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-emerald-500/20 rounded-xl p-4 text-center">
+                <div className="flex items-center justify-center space-x-2">
+                  <p className="text-2xl font-bold text-emerald-400">{user.paidLeaveBalance || 0}</p>
+                  <button onClick={openLeaveBalanceModal} className="text-emerald-400 hover:text-emerald-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">Leave Balance</p>
+              </div>
+              <div className="bg-blue-500/20 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-blue-400">{user.attendance?.length || 0}</p>
+                <p className="text-xs text-gray-500">Attendance Days</p>
+              </div>
+              <div className="bg-purple-500/20 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-purple-400">{user.leaves?.length || 0}</p>
+                <p className="text-xs text-gray-500">Leave Requests</p>
+              </div>
+            </div>
+
+            {/* Attendance Calendar */}
+            <div className="bg-white text-black rounded-xl p-6 shadow">
+              <h4 className="text-lg font-semibold text-black mb-4 flex items-center">
+                <CalendarTodayIcon className="w-5 h-5 mr-2 text-emerald-600" />
+                Attendance Calendar
+              </h4>
+              {/* Your calendar styling stays the same */}
+              <div className="attendance-calendar">
+                <DayPicker
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateClick}
+                  modifiers={{
+                    attended: attendedDates,
+                    weekend: weekendDates,
+                  }}
+                  numberOfMonths={1}
+                  showOutsideDays={false}
+                />
+              </div>
+              {/* Calendar Legend */}
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-emerald-600 rounded"></div>
+                  <span className="text-gray-600">Attended</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                  <span className="text-gray-600">Weekend</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-600 rounded"></div>
+                  <span className="text-gray-600">Selected</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-800 rounded"></div>
+                  <span className="text-gray-600">Today</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Selected Date Details */}
+            {selectedDate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <EventAvailableIcon className="w-5 h-5 mr-2 text-blue-600" />
+                    {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                    {isWeekend(selectedDate) && <WeekendIcon className="w-4 h-4 ml-2 text-yellow-500" />}
                   </div>
-                  <p className="text-xs text-gray-400">Leave Balance</p>
-                </div>
-                <div className="bg-blue-500/20 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{user.attendance?.length || 0}</p>
-                  <p className="text-xs text-gray-400">Attendance Days</p>
-                </div>
-                <div className="bg-purple-500/20 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-purple-400">{user.leaves?.length || 0}</p>
-                  <p className="text-xs text-gray-400">Leave Requests</p>
-                </div>
-              </div>
-
-              {/* Attendance Calendar */}
-              <div className="bg-gray-700/30 rounded-xl p-6">
-                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <CalendarTodayIcon className="w-5 h-5 mr-2 text-emerald-400" />
-                  Attendance Calendar
                 </h4>
                 
-                {/* Custom Calendar Styles */}
-                <style jsx>{`
-                  .attendance-calendar .rdp {
-                    --rdp-cell-size: 35px;
-                    --rdp-accent-color: #10b981;
-                    --rdp-background-color: #374151;
-                    margin: 0;
-                    color: white;
-                  }
-                  
-                  .attendance-calendar .rdp-months {
-                    justify-content: center;
-                  }
-                  
-                  .attendance-calendar .rdp-month {
-                    background: #1f2937;
-                    border-radius: 12px;
-                    padding: 16px;
-                    margin: 8px;
-                  }
-                  
-                  .attendance-calendar .rdp-caption {
-                    color: #10b981;
-                    font-weight: 600;
-                    margin-bottom: 16px;
-                  }
-                  
-                  .attendance-calendar .rdp-head_cell {
-                    color: #9ca3af;
-                    font-weight: 500;
-                    font-size: 0.75rem;
-                  }
-                  
-                  .attendance-calendar .rdp-day {
-                    width: 35px;
-                    height: 35px;
-                    border-radius: 8px;
-                    color: #e5e7eb;
-                    font-size: 0.875rem;
-                    transition: all 0.2s;
-                    border: none;
-                    background: transparent;
-                  }
-                  
-                  .attendance-calendar .rdp-day:hover {
-                    background: #4b5563;
-                    transform: scale(1.05);
-                  }
-                  
-                  .attendance-calendar .rdp-day_selected {
-                    background: #3b82f6 !important;
-                    color: white;
-                    font-weight: bold;
-                    transform: scale(1.1);
-                  }
-                  
-                  .attendance-calendar .rdp-day_attended {
-                    background: #10b981;
-                    color: white;
-                  }
-                  
-                  .attendance-calendar .rdp-day_weekend {
-                    color: #fbbf24;
-                    background: #451a03;
-                  }
-                  
-                  .attendance-calendar .rdp-day_today {
-                    background: #1e40af;
-                    color: white;
-                    font-weight: bold;
-                  }
-                `}</style>
-                
-                <div className="attendance-calendar">
-                  <DayPicker
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateClick}
-                    modifiers={{
-                      attended: attendedDates,
-                      weekend: weekendDates,
-                    }}
-                    numberOfMonths={1}
-                    showOutsideDays={false}
-                  />
-                </div>
-
-                {/* Calendar Legend */}
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-emerald-500 rounded"></div>
-                    <span className="text-gray-300">Attended</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                    <span className="text-gray-300">Weekend</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-600 rounded"></div>
-                    <span className="text-gray-300">Selected</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-800 rounded"></div>
-                    <span className="text-gray-300">Today</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Selected Date Details */}
-              {selectedDate && (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                  <h4 className="text-lg font-semibold text-white mb-3 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <EventAvailableIcon className="w-5 h-5 mr-2 text-blue-400" />
-                      {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                      {isWeekend(selectedDate) && <WeekendIcon className="w-4 h-4 ml-2 text-yellow-400" />}
-                    </div>
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm"
-                    >
-                      Edit
-                    </button>
-                  </h4>
-                  
-                  {attendanceForSelectedDate ? (
-                    <div className="space-y-3">
-                      <div className="bg-gray-700/50 rounded-lg p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="flex items-center space-x-2 mb-2">
-                              <CheckCircleIcon className="w-4 h-4 text-emerald-400" />
-                              <span className="text-sm text-gray-400">Check In</span>
-                            </div>
-                            <p className="text-lg font-semibold text-emerald-400">
-                              {formatTime(attendanceForSelectedDate.checkIn)}
-                            </p>
+                {attendanceForSelectedDate ? (
+                  <div className="space-y-3">
+                    <div className="bg-white rounded-lg p-4 shadow">
+                      {/* ... keep inner content colors mostly the same but change text to darker colors */}
+                      {/* Check In */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
+                            <span className="text-sm text-gray-600">Check In</span>
                           </div>
-                          
-                          <div>
-                            <div className="flex items-center space-x-2 mb-2">
-                              <EventBusyIcon className="w-4 h-4 text-orange-400" />
-                              <span className="text-sm text-gray-400">Check Out</span>
-                            </div>
-                            <p className="text-lg font-semibold text-orange-400">
-                              {attendanceForSelectedDate.checkOut ? formatTime(attendanceForSelectedDate.checkOut) : 'Not checked out'}
-                            </p>
-                          </div>
+                          <p className="text-lg font-semibold text-emerald-600">
+                            {formatTime(attendanceForSelectedDate.checkIn)}
+                          </p>
                         </div>
                         
-                        <div className="mt-4 pt-4 border-t border-gray-600">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <AccessTimeIcon className="w-4 h-4 text-purple-400" />
-                              <span className="text-sm text-gray-400">Hours Worked</span>
-                            </div>
-                            <p className="text-lg font-semibold text-purple-400">
-                              {calculateWorkHours(attendanceForSelectedDate.checkIn, attendanceForSelectedDate.checkOut)}
-                            </p>
+                        <div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <EventBusyIcon className="w-4 h-4 text-orange-600" />
+                            <span className="text-sm text-gray-600">Check Out</span>
                           </div>
+                          <p className="text-lg font-semibold text-orange-600">
+                            {attendanceForSelectedDate.checkOut ? formatTime(attendanceForSelectedDate.checkOut) : 'Not checked out'}
+                          </p>
                         </div>
-
-                        {/* Location Info */}
-                        {attendanceForSelectedDate.checkInLocation?.address && (
-                          <div className="mt-4 pt-4 border-t border-gray-600">
-                            <div className="flex items-start space-x-2">
-                              <LocationOnIcon className="w-4 h-4 text-blue-400 mt-1" />
-                              <div>
-                                <span className="text-sm text-gray-400">Check-in Location</span>
-                                <p className="text-sm text-gray-300 mt-1">
-                                  {attendanceForSelectedDate.checkInLocation.address}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                            {user ? (
+  <div>
+    {/* existing details */}
+    <p className="mt-2 text-sm font-semibold text-gray-800">
+      Shift: {user.userShift} {/* Or pick dynamically */}
+    </p>
+    <p className="mt-1 text-sm text-gray-700">
+      Status: {getAttendanceStatus(shifts.general, new Date(attendanceForSelectedDate.checkIn), new Date(attendanceForSelectedDate.checkOut))}
+    </p>
+  </div>
+) : null}</div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      {isWeekend(selectedDate) ? (
-                        <div className="space-y-2">
-                          <WeekendIcon className="w-12 h-12 text-yellow-400 mx-auto" />
-                          <p className="text-yellow-400 font-medium">Weekend Day</p>
-                          <p className="text-sm text-gray-400">No attendance expected</p>
+                    
+
+                      <div className="mt-4 pt-4 border-t border-gray-300">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <AccessTimeIcon className="w-4 h-4 text-purple-600" />
+                            <span className="text-sm text-gray-600">Hours Worked</span>
+                          </div>
+                          <p className="text-lg font-semibold text-purple-600">
+                            {calculateWorkHours(attendanceForSelectedDate.checkIn, attendanceForSelectedDate.checkOut)}
+                          </p>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <EventBusyIcon className="w-12 h-12 text-red-400 mx-auto" />
-                          <p className="text-red-400 font-medium">No Attendance</p>
-                          <p className="text-sm text-gray-400">Employee was absent on this day</p>
+                      </div>
+
+                      {/* Location Info */}
+                      {attendanceForSelectedDate.checkOutLocation && (
+                        <div className="mt-4 pt-4 border-t border-gray-300">
+                          <div className="flex items-start space-x-2">
+                            <LocationOnIcon className="w-4 h-4 text-blue-600 mt-1" />
+                            <div>
+                              <span className="text-sm text-gray-600">Check-out Location</span>
+                              <p className="text-sm text-gray-800 mt-1">
+                                {attendanceForSelectedDate.checkOutLocation}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {attendanceForSelectedDate.checkInLocation && (
+                        <div className="mt-4 pt-4 border-t border-gray-300">
+                          <div className="flex items-start space-x-2">
+                            <LocationOnIcon className="w-4 h-4 text-blue-600 mt-1" />
+                            <div>
+                              <span className="text-sm text-gray-600">Check-in Location</span>
+                              <p className="text-sm text-gray-800 mt-1">
+                                {attendanceForSelectedDate.checkInLocation}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    {isWeekend(selectedDate) ? (
+                      <div className="space-y-2">
+                        <WeekendIcon className="w-12 h-12 text-yellow-500 mx-auto" />
+                        <p className="text-yellow-600 font-medium">Weekend Day</p>
+                        <p className="text-sm text-gray-500">No attendance expected</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <EventBusyIcon className="w-12 h-12 text-red-600 mx-auto" />
+                        <p className="text-red-600 font-medium">No Attendance</p>
+                        <p className="text-sm text-gray-500">Employee was absent on this day</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* Basic Information */}
-              <div className="bg-gray-700/30 rounded-xl p-4">
-                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <PersonIcon className="w-5 h-5 mr-2 text-emerald-400" />
-                  Basic Information
-                </h4>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Employee Code</p>
-                      <p className="text-white font-medium">{user["Employee Code"] || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Department</p>
-                      <p className="text-white font-medium">{user.Department || 'N/A'}</p>
-                    </div>
+            {/* Basic Information */}
+            <div className="bg-white rounded-xl p-4 shadow">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <PersonIcon className="w-5 h-5 mr-2 text-emerald-600" />
+                Basic Information
+              </h4>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Employee Code</p>
+                    <p className="text-gray-900 font-medium">{user.employeeCode || 'N/A'}</p>
+                  </div>  
+                  <div>
+                    <p className="text-xs text-gray-500">Department</p>
+                    <p className="text-gray-900 font-medium">{user.Department || 'N/A'}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="text-gray-900 font-medium text-sm">{user.workEmail || 'N/A'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Mobile</p>
+                    <p className="text-gray-900 font-medium">{user.userContact || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">Email</p>
-                    <p className="text-white font-medium text-sm">{user["Work email"] || 'N/A'}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Mobile</p>
-                      <p className="text-white font-medium">{user["Mobile number"] || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Designation</p>
-                      <p className="text-white font-medium">{user.Designation || 'N/A'}</p>
-                    </div>
+                    <p className="text-xs text-gray-500">Designation</p>
+                    <p className="text-gray-900 font-medium">{user.userDesignation || 'N/A'}</p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Recent Attendance Summary with Updated Formatting */}
-              <div className="bg-gray-700/30 rounded-xl p-4">
-                <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <AccessTimeIcon className="w-5 h-5 mr-2 text-yellow-400" />
-                  Recent Attendance (Last 5 Days)
-                </h4>
-                <div className="space-y-2">
-                  {user.attendance?.slice(-5).reverse().map((att, index) => (
-                    <div key={index} className="flex justify-between items-center bg-gray-600/30 p-3 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-white">{formatDate(att.date)}</p>
-                        <p className="text-xs text-gray-400">
-                          {att.checkIn ? `${formatTime(att.checkIn)}` : 'No check-in'} - {att.checkOut ? `${formatTime(att.checkOut)}` : 'No check-out'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-emerald-400">
-                          {calculateWorkHours(att.checkIn, att.checkOut)}
-                        </p>
-                      </div>
+            {/* Recent Attendance Summary with Updated Formatting */}
+            <div className="bg-white rounded-xl p-4 shadow">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <AccessTimeIcon className="w-5 h-5 mr-2 text-yellow-600" />
+                Recent Attendance (Last 5 Days)
+              </h4>
+              <div className="space-y-2">
+                {user.attendance?.slice(-5).reverse().map((att, index) => (
+                  <div key={index} className="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{formatDate(att.date)}</p>
+                      <p className="text-xs text-gray-500">
+                        {att.checkIn ? `${formatTime(att.checkIn)}` : 'No check-in'} - {att.checkOut ? `${formatTime(att.checkOut)}` : 'No check-out'}
+                      </p>
                     </div>
-                  )) || (
-                    <p className="text-gray-400 text-center py-4">No attendance records found</p>
-                  )}
-                </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-emerald-600">
+                        {calculateWorkHours(att.checkIn, att.checkOut)}
+                      </p>
+                    </div>
+                  </div>
+                )) || (
+                  <p className="text-gray-500 text-center py-4">No attendance records found</p>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
-      {isModalOpen && (
-        <AttendanceModal
-          user={user}
-          date={selectedDate}
-          attendance={attendanceForSelectedDate}
-          onClose={() => setIsModalOpen(false)}
-          onUserUpdate={onUserUpdate}
-        />
-      )}
-      {isLeaveBalanceModalOpen && (
-        <LeaveBalanceModal
-          user={user}
-          onClose={closeLeaveBalanceModal}
-          onUserUpdate={onUserUpdate}
-        />
-      )}
-    </>
+    </div>
+    </div>
   );
 }
 

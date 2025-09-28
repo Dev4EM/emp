@@ -7,7 +7,7 @@ import useRealTimeNotifications from '../hooks/useRealTimeNotifications.jsx';
 import { useSocket } from '../hooks/useSocket.jsx';
 import NotificationSidebar from './NotificationSidebar';
 
-const Navbar = ({ toggleSidebar, fixed = false }) => {
+const Navbar = ({ toggleSidebar, fixed = false }:any) => {
   const { user }:any = useUser();
   const { unreadCount } = useRealTimeNotifications();
   const { isConnected } = useSocket();
