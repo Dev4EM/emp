@@ -1,54 +1,50 @@
 const express = require('express');
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 const router = express.Router();
 
 router.get('/reverse', async (req, res) => {
   const { lat, lon } = req.query;
 
-  // Validate latitude and longitude presence
   if (!lat || !lon) {
     return res.status(400).json({ error: 'Missing latitude or longitude' });
   }
 
-  // Validate latitude and longitude format
   const latNum = parseFloat(lat);
   const lonNum = parseFloat(lon);
-  if (
-    Number.isNaN(latNum) || Number.isNaN(lonNum) ||
-    latNum < -90 || latNum > 90 ||
-    lonNum < -180 || lonNum > 180
-  ) {
-    return res.status(400).json({ error: 'Invalid latitude or longitude values' });
+
+  if (isNaN(latNum) || isNaN(lonNum)) {
+    return res.status(400).json({ error: 'Latitude and longitude must be valid numbers' });
   }
 
   try {
-    // Add a proper User-Agent to comply with Nominatim policy
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latNum}&lon=${lonNum}`,
-      {
-        headers: {
-          'User-Agent': 'EmpeopleApp/1.0 (contact@empeople.esromagica.in)', // Your app info here
-          'Accept-Language': 'en' // Optional: specify language for results
-        },
-        timeout: 10000 // Optional: timeout after 10 seconds
-      }
-    );
+    console.log(`Reverse geocoding for lat: ${latNum}, lon: ${lonNum}`);
 
-    if (!response.ok) {
-      console.error(`OpenStreetMap API error: ${response.status} ${response.statusText}`);
-      return res.status(response.status).json({ error: 'Geocoding service error' });
+    const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+      params: {
+        format: 'jsonv2',
+        lat: latNum,
+        lon: lonNum,
+      },
+      headers: {
+        'User-Agent': 'YourAppName/1.0 (your@email.com)',
+      },
+    });
+
+    const data = response.data;
+    console.log('Nominatim response:', data);
+
+    const address = data.display_name && data.display_name.trim().length > 0
+      ? data.display_name
+      : null;
+
+    if (!address) {
+      return res.json({ address: null, message: 'Location not found' });
     }
 
-    const data = await response.json();
-
-    if (!data.display_name) {
-      return res.status(404).json({ error: 'Location not found' });
-    }
-
-    res.json({ address: data.display_name });
+    res.json({ address });
   } catch (error) {
-    console.error('Reverse geocoding error:', error);
+    console.error('Reverse geocoding error:', error.message || error);
     res.status(500).json({ error: 'Server error' });
   }
 });

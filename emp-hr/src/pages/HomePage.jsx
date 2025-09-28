@@ -179,12 +179,9 @@ const [leaveBalance, setLeaveBalance] = useState('');
 
     try {
       const { latitude, longitude } = coords;
-      const address = await fetchAddress(latitude, longitude);
+      // const address = await fetchAddress(latitude, longitude);
 
-      if (!address || address === 'Location not found') {
-        toast.error('Location Not Found! Please Refresh Page!');
-        return;
-      }
+      
       const response = await checkIn({ lat: latitude, lng: longitude, address });
       toast.success(response.message || 'Checked in successfully!');
       await fetchUser();
