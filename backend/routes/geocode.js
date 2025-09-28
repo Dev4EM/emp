@@ -1,4 +1,3 @@
-
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -16,17 +15,23 @@ router.get('/reverse', async (req, res) => {
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
       {
         headers: {
-          'User-Agent': 'YourAppName/1.0 (your@email.com)'
+          'User-Agent': 'EmpeopleApp/1.0 (contact@empeople.esromagica.in)'
         }
       }
     );
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'Geocoding failed' });
+      console.error(`OpenStreetMap API error: ${response.status} ${response.statusText}`);
+      return res.status(response.status).json({ error: 'Geocoding service error' });
     }
 
     const data = await response.json();
-    res.json({ address: data.display_name || 'Location not found' });
+
+    if (!data.display_name) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+
+    res.json({ address: data.display_name });
   } catch (error) {
     console.error('Reverse geocoding error:', error);
     res.status(500).json({ error: 'Server error' });
