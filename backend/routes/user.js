@@ -111,6 +111,12 @@ router.get('/:id/leave-balance', auth, async (req, res) => {
 // Assuming your imports and middleware are set above
 
 
+function normalizeToDay(date = new Date()) {
+  const dayString = date.toISOString().split('T')[0];
+  const dayDate = new Date(dayString + 'T00:00:00.000Z');
+  return { dayString, dayDate };
+}
+
 router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
   try {
     const { userId, date, checkIn, checkOut, comment } = req.body;
@@ -123,33 +129,28 @@ router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Invalid userId' });
     }
 
-    // Normalize the date range (start and end of the day)
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Use normalizeToDay to get the UTC-normalized date
+    const { dayString, dayDate } = normalizeToDay(new Date(date));
 
-    const endOfDay = new Date(date);
+    // Define date range for querying
+    const startOfDay = new Date(dayDate);
+    const endOfDay = new Date(dayDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Normalize date for storing (UTC midnight)
-    const normalizedDate = new Date(Date.UTC(
-      startOfDay.getFullYear(),
-      startOfDay.getMonth(),
-      startOfDay.getDate()
-    ));
-
-    // Helper to parse checkIn/checkOut times
+    // Helper to parse checkIn/checkOut times (in IST)
     const parseDateTime = (dateStr, timeStr) => {
       if (!timeStr) return null;
       const [hour, minute] = timeStr.split(':').map(Number);
-      const dt = new Date(dateStr);
-      dt.setHours(hour, minute, 0, 0);
-      return dt;
+
+      // Create IST date and convert to UTC
+      const local = new Date(`${dateStr}T${timeStr}:00+05:30`);
+      return new Date(local.toISOString()); // This is in UTC
     };
 
-    const checkInDate = checkIn ? parseDateTime(date, checkIn) : null;
-    const checkOutDate = checkOut ? parseDateTime(date, checkOut) : null;
+    const checkInDate = checkIn ? parseDateTime(dayString, checkIn) : null;
+    const checkOutDate = checkOut ? parseDateTime(dayString, checkOut) : null;
 
-    // Use date range instead of exact match to avoid timezone issues
+    // Use date range instead of exact match
     let attendance = await Attendance.findOne({
       employeeId: userId,
       date: {
@@ -162,7 +163,7 @@ router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
       // Create a new attendance record
       attendance = new Attendance({
         employeeId: userId,
-        date: normalizedDate,
+        date: dayDate, // normalized UTC date
         remarks: comment || '',
         updatedBy: req.user._id,
         updatedAt: new Date(),
