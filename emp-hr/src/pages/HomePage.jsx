@@ -12,7 +12,6 @@ import {
   checkOut,
   getUser,
   getTodayAttendance,
-  fetchAddress,
   getMonthlyAttendance,
   getDepartmentWeekOff,
   getUserLeaveBalance,
@@ -181,7 +180,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
       const { latitude, longitude } = coords;
       // const address = await fetchAddress(latitude, longitude);
 
-      
+      const address="Address";
       const response = await checkIn({ lat: latitude, lng: longitude, address });
       toast.success(response.message || 'Checked in successfully!');
       await fetchUser();
@@ -215,7 +214,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
     setIsProcessing(true);
     try {
       const { latitude, longitude } = coords;
-      const address = await fetchAddress(latitude, longitude);
+      const address = "Address Fetched!";
       const response = await checkOut({ lat: latitude, lng: longitude, address });
       const nowIso = new Date().toISOString();
       setCheckOutTime(nowIso);
