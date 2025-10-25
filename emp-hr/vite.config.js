@@ -4,8 +4,14 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',  // to listen on all interfaces
-    allowedHosts: ['empeople.esromagica.in', 'localhost'], // allow your domain and localhost
-    port: 5173, // your port
+    host: '0.0.0.0',
+    allowedHosts: ['empeople.esromagica.in', 'localhost'],
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
 });

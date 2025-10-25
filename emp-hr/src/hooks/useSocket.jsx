@@ -26,7 +26,7 @@ export const SocketProvider = ({ children }) => {
         return;
       }
 
-      const newSocket = io(import.meta.env.VITE_BACKEND_URL || 'https://api.empeople.esromagica.in', {
+      const newSocket = io( 'https://api1.empeople.esromagica.in', {
         auth: {
           token: token
         },

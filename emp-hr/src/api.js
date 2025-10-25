@@ -1,5 +1,6 @@
 const API_BASE_URL = 'https://api1.empeople.esromagica.in/api';
 
+
 // This function will handle the actual API request logic
 const request = async (endpoint, options) => {
   const url = `${API_BASE_URL}${endpoint}`;

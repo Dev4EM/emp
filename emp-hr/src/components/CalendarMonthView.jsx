@@ -76,7 +76,6 @@ const weekOffs = useMemo(() => {
 
 console.log( "your week off is ",propWeekOffs)
 
-  // Map for quick lookup of week offs
   const weekOffMap = useMemo(() => {
     const m = new Map();
     for (const d of weekOffs) {
@@ -117,29 +116,30 @@ console.log( "your week off is ",propWeekOffs)
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   }, []);
 
- const getStatus = (d) => {
-  const k = isoKey(d);
+const getStatus = (d) => {
+  const k = isoKey(d); // e.g., '2025-09-30'
   const rec = attendanceMap.get(k);
 
-  // Week offs have priority, even in the future
+  // 1. If it's a week off → 'weekoff'
   if (weekOffMap.get(k)) {
     return 'weekoff';
   }
 
-  // Future dates (excluding week offs)
+  // 2. If it's in the future → 'future'
   if (d > today) {
     return 'future';
   }
 
-  // No record means leave
+  // 3. If no record → 'leave'
   if (!rec) return 'leave';
 
-  // Determine check-in status
+  // 4. Otherwise, based on checkIn/out
   if (rec.checkIn && rec.checkOut) return 'out';
   if (rec.checkIn) return 'in';
 
   return 'leave';
 };
+
 
 
 

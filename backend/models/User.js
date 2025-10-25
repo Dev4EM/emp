@@ -82,6 +82,7 @@ const UserSchema = new mongoose.Schema({
     isBlacklisted: { type: Boolean, default: false },
     blacklistReason: { type: String },
     blacklistComments: { type: String },
+    isLeaveApplicable: { type: String, default: 'false' },
 
 }, { timestamps: true });
 

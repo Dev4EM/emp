@@ -2,11 +2,12 @@ import axios from 'axios';
 
 // Base URL for all API requests
 const API = axios.create({
-  baseURL: 'https://api.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
+  baseURL: 'https://api1.empeople.esromagica.in/api', // 🔁 change this to your backend base URL
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
 
 // Add auth token to every request
 API.interceptors.request.use((config) => {
@@ -194,7 +195,8 @@ export const getPastLeaves = async (page = 1, limit = 10) => {
 };
 
 export const cancelLeave = async (leaveToCancel, leaves, setLeaves, closeCancelModal, toast) => {
-  const response = await API.delete(`/employee/delete-leave/${leaveToCancel}`);
+  const response = await API.delete(`/employee/leave/${leaveToCancel}`);
+  // /leave/:leaveId
   console.log('Cancel leave response:', response); // Debug log
   return response.data;
 };

@@ -66,20 +66,60 @@ const formatDateLocal = (date) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-  const handleSubmitAttendance = async () => {
+// Convert local time string (HH:mm) to UTC time string (HH:mm)
+const convertLocalTimeToUTC = (timeStr) => {
+  if (!timeStr) return null;
+
+  // Assume local time is IST (UTC+5:30)
+  const [hours, minutes] = timeStr.split(':').map(Number);
+
+  // Create a Date object using today's date and given time in IST
+  // Note: Date object interprets time in local timezone, so to force IST you can
+  // create UTC date with offset applied manually
+  const date = new Date();
+  
+  // Set date with IST time (hours, minutes)
+  date.setHours(hours);
+  date.setMinutes(minutes);
+  date.setSeconds(0);
+  date.setMilliseconds(0);
+
+  // IST offset is +5:30 = 330 minutes
+  const istOffsetMinutes = 330;
+
+  // Calculate UTC time in minutes
+  const utcTotalMinutes = hours * 60 + minutes - istOffsetMinutes;
+
+  // Handle day wrap-around if negative or > 1440
+  let utcHours = Math.floor(utcTotalMinutes / 60);
+  let utcMinutes = utcTotalMinutes % 60;
+  if (utcMinutes < 0) utcMinutes += 60;
+  if (utcHours < 0) utcHours += 24;
+
+  // Format as HH:mm
+  const utcTimeStr = `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
+  return utcTimeStr;
+};
+
+const handleSubmitAttendance = async () => {
   if (!selectedUser) return toast.warning('No user selected');
   if (!selectedDate) return toast.warning('Please select a date');
   if (!comment.trim()) return toast.warning('Please enter a comment');
 
   const formattedDate = formatDateLocal(selectedDate);
+
+  // Convert times from IST to UTC
+  const utcCheckIn = convertLocalTimeToUTC(checkIn);
+  const utcCheckOut = convertLocalTimeToUTC(checkOut);
+
   const payload = {
     userId: selectedUser._id,
     date: formattedDate,
-    checkIn: checkIn || null,
-    checkOut: checkOut || null,
+    checkIn: utcCheckIn,
+    checkOut: utcCheckOut,
     comment: comment.trim(),
   };
-  
+
   console.log("Payload is:", payload);
 
   try {
@@ -91,6 +131,7 @@ const formatDateLocal = (date) => {
     console.log(err);
   }
 };
+
 
   return (
     <div className="min-h-screen bg-gray-300 py-8 px-4">
