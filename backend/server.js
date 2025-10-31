@@ -12,6 +12,9 @@ const adminRoutes = require('./routes/admin');
 const { router: userRoutes, addHourlyLeaveBalance } = require('./routes/user');
 const notificationRoutes = require('./routes/notification'); // Add this
 const weekOffRoutes = require('./routes/weekOffRoutes');
+const programRoutes =require( './routes/programRoutes.js');
+const batchRoute =require( './routes/batchRoutes.js');
+const sessionRoute =require('./routes/sessionRoutes.js');
 const app = express();
 const server = http.createServer(app);
 const cron = require('node-cron');
@@ -120,6 +123,9 @@ app.use('/api/user', userRoutes);
 app.use('/api/weekoff', weekOffRoutes);
 app.use('/api/notifications', notificationRoutes); // Add this line
 app.use('/api/geocode', geocodeRoutes);
+app.use('/api/programs',programRoutes);
+app.use('/api/batch',batchRoute);
+app.use('/api/session',sessionRoute);
 server.listen(6000, '::', () => {
   console.log('Server listening on all IPv6 interfaces on port 6000');
 });
