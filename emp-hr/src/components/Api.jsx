@@ -318,4 +318,59 @@ export const addEmployee = async (employeeData) => {
   return response.data;
 };
 
+export const getPrograms = async () => {
+  const response = await API.get('/programs');
+  return response.data;
+};
+export const createPrograms = async (formData) => {
+  const response = await API.post('/programs',formData);
+  return response.data;
+};
+// ✅ Update a program
+export const updatePrograms = async (id, formData) => {
+  const response = await API.put(`/programs/${id}`, formData);
+  return response.data;
+};
+
+// ✅ Delete a program
+export const deleteProgram = async (id) => {
+  const response = await API.delete(`/programs/${id}`);
+  return response.data;
+};
+
+export const getBatch = async () => {
+  const response = await API.get('/batch');
+  return response.data;
+};
+export const getBatchById = async (id) => {
+  const response = await API.get(`/batch/${id}`);
+  return response.data;
+};
+export const createBatch = async (formData) => {
+  const response = await API.post('/batch',formData);
+  return response.data;
+};
+export const deleteBatch = async (batchId) => {
+  const response = await API.delete(`/batch/${batchId}`);
+  return response.data;
+};
+export const getSession = async () => {
+  const response = await API.get('/session');
+  return response.data;
+};
+export const createSession = async (formData) => {
+  const response = await API.post('/session',formData);
+  return response.data;
+};
+export const updateSession = async (sessionId, formData) => {
+  const response = await API.put(`/session/${sessionId}`, formData);
+  return response.data;
+};
+
+export const deleteSession = async (sessionId) => {
+  const response = await API.delete(`/session/${sessionId}`);
+  return response.data;
+};
+
+
 export default API;
