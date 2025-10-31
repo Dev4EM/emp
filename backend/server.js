@@ -103,9 +103,13 @@ app.get('/', (req, res) => {
 
 // Schedule cron job to run every minute for testing
 cron.schedule('0 0 1 * *', async () => {
-  console.log('📅 Running monthly leave balance update job');
+  console.log('🧪 Monthly leave update run on 1st day at 12:00 AM IST');
   await addHourlyLeaveBalance();
+}, {
+  timezone: 'Asia/Kolkata'
 });
+
+
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -116,6 +120,11 @@ app.use('/api/user', userRoutes);
 app.use('/api/weekoff', weekOffRoutes);
 app.use('/api/notifications', notificationRoutes); // Add this line
 app.use('/api/geocode', geocodeRoutes);
-server.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT} with Socket.IO`);
+server.listen(6000, '::', () => {
+  console.log('Server listening on all IPv6 interfaces on port 6000');
 });
+
+
+
+
+

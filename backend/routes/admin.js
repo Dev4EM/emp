@@ -498,45 +498,62 @@ router.get('/all-leaves', auth, checkAdmin, async (req, res) => {
     const leaves = await Leave.find({})
       .populate({
         path: 'employeeId',
-        select: 'First name Work email Employee Code Department Designation'
+        select: [
+          'First name',
+          'Last name',
+          'Work email',
+          'Employee Code',
+          'Department',
+          'Designation',
+        ],
       })
       .populate({
         path: 'approvedBy',
-        select: 'First name Work email'
+        select: ['First name', 'Last name', 'Work email'],
       })
       .sort({ appliedOn: -1 });
 
-    const formattedLeaves = leaves.map(leave => ({
-      leaveId: leave._id,
-      employeeId: leave.employeeId?._id || null,
-      employeeName: leave.employeeId?.['First name'] || '',
-      employeeEmail: leave.employeeId?.['Work email'] || '',
-      employeeCode: leave.employeeId?.['Employee Code'] || '',
-      department: leave.employeeId?.Department || '',
-      designation: leave.employeeId?.Designation || '',
-      date: leave.date,
-      type: leave.type,
-      duration: leave.duration,
-      reason: leave.reason,
-      appliedOn: leave.appliedOn,
-      status: leave.status,
-      approvedBy: leave.approvedBy?.['First name'] || '',
-      approvedOn: leave.approvedOn,
-      rejectionReason: leave.rejectionReason
-    }));
+    console.log('Leaves with populated users:', JSON.stringify(leaves, null, 2));
 
-    res.json({
-      success: true,
-      count: formattedLeaves.length,
-      leaves: formattedLeaves
+    const formattedLeaves = leaves.map((leave) => {
+      const emp = leave.employeeId || {};
+      const approver = leave.approvedBy || {};
+
+      const employeeName = `${emp['First name'] || ''} ${emp['Last name'] || ''}`.trim();
+      const approverName = `${approver['First name'] || ''} ${approver['Last name'] || ''}`.trim();
+
+      return {
+        leaveId: leave._id,
+        employeeId: emp._id || null,
+        employeeName,
+        employeeEmail: emp['Work email'] || '',
+        employeeCode: emp['Employee Code'] || '',
+        department: emp['Department'] || '',
+        designation: emp['Designation'] || '',
+        date: leave.date,
+        type: leave.type,
+        duration: leave.duration,
+        reason: leave.reason,
+        appliedOn: leave.appliedOn,
+        status: leave.status,
+        approvedBy: approverName,
+        approvedByEmail: approver['Work email'] || '',
+        approvedOn: leave.approvedOn || null,
+        rejectionReason: leave.rejectionReason || '',
+      };
     });
 
+    return res.json({
+      success: true,
+      count: formattedLeaves.length,
+      leaves: formattedLeaves,
+    });
   } catch (error) {
     console.error('Error fetching all leaves:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server Error',
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -546,25 +563,26 @@ router.get('/all-leaves', auth, checkAdmin, async (req, res) => {
  */
 router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
   try {
-    console.log('Fetching all users with attendance (dashboard)...');
+    console.log('Fetching all users with yearly attendance and leaves (dashboard)...');
 
     const queryDate = req.query.date ? new Date(req.query.date) : new Date();
     queryDate.setHours(0, 0, 0, 0);
 
-    const startOfMonth = new Date(queryDate.getFullYear(), queryDate.getMonth(), 1);
-    const endOfMonth = new Date(queryDate.getFullYear(), queryDate.getMonth() + 1, 0);
-    endOfMonth.setHours(23, 59, 59, 999);
+    const startOfYear = new Date(queryDate.getFullYear(), 0, 1); // Jan 1st
+    const endOfYear = new Date(queryDate.getFullYear(), 11, 31); // Dec 31st
+    endOfYear.setHours(23, 59, 59, 999);
 
     const users = await User.find()
       .select('-password')
       .sort({ "First name": 1 });
 
-    const userAttendancePromises = users.map(async (user) => {
+    const userDataPromises = users.map(async (user) => {
+      // === Attendance Records ===
       const attendanceRecords = await Attendance.find({
         employeeId: user._id,
         date: {
-          $gte: startOfMonth,
-          $lte: endOfMonth
+          $gte: startOfYear,
+          $lte: endOfYear
         }
       }).sort({ date: 1 });
 
@@ -577,6 +595,28 @@ router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
         remarks: record.remarks || ''
       }));
 
+      // === Leave Records ===
+      const leaveRecords = await Leave.find({
+        employeeId: user._id,
+        date: {
+          $gte: startOfYear,
+          $lte: endOfYear
+        }
+      }).sort({ date: 1 });
+
+      const formattedLeaves = leaveRecords.map(leave => ({
+        date: leave.date?.toISOString().split('T')[0] || '',
+        type: leave.type,
+        duration: leave.duration,
+        half: leave.half,
+        status: leave.status,
+        reason: leave.reason || '',
+        approvedBy: leave.approvedBy || null,
+        approvedOn: leave.approvedOn || null,
+        appliedOn: leave.appliedOn?.toISOString() || null
+      }));
+
+      // === Combined Result ===
       return {
         _id: user._id,
         name: `${user['First name'] || ''} ${user['Last name'] || ''}`.trim(),
@@ -586,24 +626,26 @@ router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
         userDesignation: user['Designation'] || '',
         userType: user['userType'] || '',
         workEmail: user['Work email'] || '',
-        userShift:user.Shift ||'No',
+        userShift: user.Shift || 'No',
         department: user.Department || '',
-        attendance: formattedAttendance
+        paidLeaveBalance: user.paidLeaveBalance || 0,
+        attendance: formattedAttendance,
+        leaves: formattedLeaves  // ✅ Added leave data here
       };
     });
 
-    const usersWithAttendance = await Promise.all(userAttendancePromises);
+    const usersWithData = await Promise.all(userDataPromises);
 
-    console.log(`Found ${usersWithAttendance.length} users with attendance`);
+    console.log(`Found ${usersWithData.length} users with attendance and leave data`);
 
     res.json({
       success: true,
-      count: usersWithAttendance.length,
-      users: usersWithAttendance,
+      count: usersWithData.length,
+      users: usersWithData,
     });
 
   } catch (error) {
-    console.error('Error fetching dashboard users with attendance:', error);
+    console.error('Error fetching dashboard users with attendance and leaves:', error);
     res.status(500).json({
       success: false,
       message: 'Server Error',
@@ -611,6 +653,8 @@ router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
     });
   }
 });
+
+
 
 /**
  * ROUTE: PUT /attendance/:userId

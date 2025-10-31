@@ -302,7 +302,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
         <h1 className="text-2xl bg-white p-3 mb-4">
           Welcome,{' '}
           <span className="font-bold">{user?.['First name'] || 'Employee'}</span> ! May your
-          starshine guide you to a stellar day !
+          starshine guide you to a stellar day ESROMAGICA!
         </h1>
         <div className="bg-white p-5 rounded shadow-md mb-6">
           <div className="flex justify-between items-center mb-4 flex-col md:flex-row">

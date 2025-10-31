@@ -26,29 +26,29 @@ async function addHourlyLeaveBalance() {
   try {
     const leaveToAdd = 1.5;
 
-    // Find eligible users where isLeaveApplicable is true
-    const eligibleUsers = await User.find({
-      isLeaveApplicable: true
-    });
-
-    if (eligibleUsers.length === 0) {
-      console.log('📭 No eligible users found with leave applicable.');
-      return;
-    }
-
-    const eligibleUserIds = eligibleUsers.map(user => user._id);
-
-    // Add 1.5 days leave to eligible users
+    // Update users with isLeaveApplicable exactly string "true"
     const result = await User.updateMany(
-      { _id: { $in: eligibleUserIds } },
+      { isLeaveApplicable: "true" },
       { $inc: { paidLeaveBalance: leaveToAdd } }
     );
+
+    if (result.modifiedCount === 0) {
+      console.log(' No users eligible  found with leave applicable.');
+      const countAny = await User.countDocuments({ isLeaveApplicable: { $exists: true } });
+      const totalUsers = await User.countDocuments();
+      console.log(`🔍 Users with isLeaveApplicable field: ${countAny}`);
+      console.log(`👥 Total users in collection: ${totalUsers}`);
+      return;
+    }
 
     console.log(`✅ Monthly leave granted: ${leaveToAdd} days to ${result.modifiedCount} eligible users.`);
   } catch (err) {
     console.error('❌ Error updating monthly leave balance:', err);
   }
 }
+
+
+
 
 
 
@@ -111,12 +111,6 @@ router.get('/:id/leave-balance', auth, async (req, res) => {
 // Assuming your imports and middleware are set above
 
 
-function normalizeToDay(date = new Date()) {
-  const dayString = date.toISOString().split('T')[0];
-  const dayDate = new Date(dayString + 'T00:00:00.000Z');
-  return { dayString, dayDate };
-}
-
 router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
   try {
     const { userId, date, checkIn, checkOut, comment } = req.body;
@@ -129,28 +123,33 @@ router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Invalid userId' });
     }
 
-    // Use normalizeToDay to get the UTC-normalized date
-    const { dayString, dayDate } = normalizeToDay(new Date(date));
+    // Normalize the date range (start and end of the day)
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
 
-    // Define date range for querying
-    const startOfDay = new Date(dayDate);
-    const endOfDay = new Date(dayDate);
+    const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Helper to parse checkIn/checkOut times (in IST)
+    // Normalize date for storing (UTC midnight)
+    const normalizedDate = new Date(Date.UTC(
+      startOfDay.getFullYear(),
+      startOfDay.getMonth(),
+      startOfDay.getDate()
+    ));
+
+    // Helper to parse checkIn/checkOut times
     const parseDateTime = (dateStr, timeStr) => {
       if (!timeStr) return null;
       const [hour, minute] = timeStr.split(':').map(Number);
-
-      // Create IST date and convert to UTC
-      const local = new Date(`${dateStr}T${timeStr}:00+05:30`);
-      return new Date(local.toISOString()); // This is in UTC
+      const dt = new Date(dateStr);
+      dt.setHours(hour, minute, 0, 0);
+      return dt;
     };
 
-    const checkInDate = checkIn ? parseDateTime(dayString, checkIn) : null;
-    const checkOutDate = checkOut ? parseDateTime(dayString, checkOut) : null;
+    const checkInDate = checkIn ? parseDateTime(date, checkIn) : null;
+    const checkOutDate = checkOut ? parseDateTime(date, checkOut) : null;
 
-    // Use date range instead of exact match
+    // Use date range instead of exact match to avoid timezone issues
     let attendance = await Attendance.findOne({
       employeeId: userId,
       date: {
@@ -163,7 +162,7 @@ router.put('/attendance/update', auth, checkAdmin, async (req, res) => {
       // Create a new attendance record
       attendance = new Attendance({
         employeeId: userId,
-        date: dayDate, // normalized UTC date
+        date: normalizedDate,
         remarks: comment || '',
         updatedBy: req.user._id,
         updatedAt: new Date(),
