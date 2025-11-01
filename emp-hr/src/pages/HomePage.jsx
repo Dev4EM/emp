@@ -32,120 +32,126 @@ function HomePage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateRecord, setSelectedDateRecord] = useState(null);
   const [departmentWeekOffDays, setDepartmentWeekOffDays] = useState([]);
-const [leaveBalance, setLeaveBalance] = useState('');
+  const [leaveBalance, setLeaveBalance] = useState(0);
+
   const { coords, isGeolocationAvailable, isGeolocationEnabled } = useGeolocated({
     positionOptions: { enableHighAccuracy: true },
     userDecisionTimeout: 5000,
   });
 
-  // Map weekday names to numbers for JS Date.getDay()
-
-  // Updates current time every second
+  // Update current time every second
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch user once on mount
+  // Fetch user, leave balance, and today's attendance
   useEffect(() => {
-  const fetchUserAndBalance = async () => {
-    try {
-      const userResponse = await getUser();
-      const userId = userResponse._id;
-      const balanceResponse = await getUserLeaveBalance(userId);
-
-      if (balanceResponse && typeof balanceResponse.remainingPaidLeave === 'number') {
-        setLeaveBalance(balanceResponse.remainingPaidLeave);
-      } else {
-        setLeaveBalance(0); // fallback
-        console.warn('Unexpected leave balance response:', balanceResponse);
-      }
-    } catch (err) {
-      console.error('Leave balance fetch error:', err);
-      toast.error(err.response?.data?.message || 'Failed to fetch user or leave balance.');
-    } finally {
-      setBalanceLoading(false);
-    }
-  };
-
-  fetchUserAndBalance();
-  fetchUser();
-}, []);
-
-
-  // Fetch attendance list for current month on mount
-  useEffect(() => {
-    fetchUser();
-
-    const getCurrentMonthDateRange = () => {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        .toISOString()
-        .split('T')[0];
-      return { start, end };
-    };
-
-    const fetchAttendance = async () => {
+    const fetchData = async () => {
       try {
-        const { start, end } = getCurrentMonthDateRange();
-        const attendance = await getMonthlyAttendance(start, end);
-        
-        setAttendanceList(attendance || []);
-      } catch (error) {
-        
-        toast.error('Failed to load attendance');
+        const userData = await getUser();
+        setUser(userData);
+
+        // Leave balance
+        const balanceResponse = await getUserLeaveBalance(userData._id);
+        setLeaveBalance(
+          balanceResponse?.remainingPaidLeave ?? 0
+        );
+
+        // Department week off
+        if (userData?.Department) {
+          try {
+            const deptWeekOff = await getDepartmentWeekOff(userData.Department);
+            setDepartmentWeekOffDays(deptWeekOff.weekOffDays || []);
+          } catch (err) {
+            console.error('Failed to fetch department week off', err);
+            toast.error('Department week off not found. Please contact IT.');
+          }
+        }
+
+        // Today's attendance
+        const todayAttendance = await getTodayAttendance();
+        if (Array.isArray(todayAttendance) && todayAttendance.length > 0) {
+          const record = todayAttendance[0];
+
+          if (record.checkIn) {
+            setCheckInTime(record.checkIn);
+            setHasCheckedIn(true);
+            setCheckInAddress(record.checkInLocation?.address || 'N/A');
+          }
+
+          if (record.checkOut) {
+            setCheckOutTime(record.checkOut);
+            setHasCheckedOut(true);
+            setCheckOutAddress(record.checkOutLocation?.address || 'N/A');
+          }
+        }
+
+        // Monthly attendance
+        await fetchMonthlyAttendance();
+      } catch (err) {
+        console.error('Fetch Error:', err);
+        toast.error(err.response?.data?.message || 'Failed to fetch data.');
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchAttendance();
+    fetchData();
   }, []);
-  const fetchUser = async () => {
-    try {
-      const userData = await getUser();
-      setUser(userData);
-    
 
-      // Fetch department week off if department exists
-      if (userData?.Department) {
-        try {
-          const deptWeekOff = await getDepartmentWeekOff(userData.Department);
-          // Convert week off days strings to numbers for calendar
-         
-          setDepartmentWeekOffDays(deptWeekOff.weekOffDays);
-        
-        } catch (err) {
-          console.error('Failed to fetch department week off', err);
-          toast.error("Your Department Not found! please contact With IT Department")
-        }
-      }
-
-      // Fetch today's attendance
-      const todayAttendance = await getTodayAttendance();
-      if (Array.isArray(todayAttendance) && todayAttendance.length > 0) {
-        const record = todayAttendance[0];
-
-        if (record.checkIn) {
-          setCheckInTime(record.checkIn);
-          setHasCheckedIn(true);
-          setCheckInAddress(record.checkInLocation?.address || 'N/A');
-        }
-
-        if (record.checkOut) {
-          setCheckOutTime(record.checkOut);
-          setHasCheckedOut(true);
-          setCheckOutAddress(record.checkOutLocation?.address || 'N/A');
-        }
-      }
-    } catch (err) {
-      console.error('Fetch Error:', err);
-      toast.error(err.response?.data?.message || 'Failed to fetch data.');
-    } finally {
-      setLoading(false);
-    }
+  const getCurrentMonthDateRange = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .split('T')[0];
+    return { start, end };
   };
+  const getCalendarDateRange = (year, month) => {
+  // month is 0-based: Jan = 0
+  const firstOfMonth = new Date(year, month, 1);
+  const lastOfMonth = new Date(year, month + 1, 0);
+
+  // Day of week for first day of month (0 = Sunday)
+  const startDayOfWeek = firstOfMonth.getDay();
+  // Subtract 6 days if you want at least 6 previous month dates
+  const startDate = new Date(firstOfMonth);
+  startDate.setDate(firstOfMonth.getDate() - 6);
+
+  // Day of week for last day of month
+  const endDayOfWeek = lastOfMonth.getDay();
+  const endDate = new Date(lastOfMonth);
+  // Add 6 days for next month
+  endDate.setDate(lastOfMonth.getDate() + 6);
+
+  return {
+    start: startDate.toISOString().split('T')[0],
+    end: endDate.toISOString().split('T')[0],
+  };
+};
+
+
+const fetchMonthlyAttendance = async (year, month) => {
+  try {
+    const { start, end } = getCalendarDateRange(year, month);
+    const attendance = await getMonthlyAttendance(start, end);
+    setAttendanceList(attendance || []);
+  } catch (err) {
+    console.error('Failed to fetch monthly attendance', err);
+    toast.error('Failed to load attendance.');
+  }
+};
+
+
+const handleMonthChange = async (date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  await fetchMonthlyAttendance(year, month);
+};
+
 
   const formatTime = (isoTime) => {
     if (!isoTime) return 'N/A';
@@ -159,6 +165,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
   const calculateWorkDuration = (checkInTime, checkOutTime) => {
     if (!checkInTime || !checkOutTime) return null;
     const diffMs = new Date(checkOutTime) - new Date(checkInTime);
+    if (diffMs < 0) return '0h 0m';
     const hours = Math.floor(diffMs / 3600000);
     const minutes = Math.floor((diffMs % 3600000) / 60000);
     return `${hours}h ${minutes}m`;
@@ -169,35 +176,18 @@ const [leaveBalance, setLeaveBalance] = useState('');
       toast.error('Location is required to check in.');
       return;
     }
-
     if (hasCheckedIn) {
       toast.info('You have already checked in.');
       return;
     }
     setIsProcessing(true);
-
     try {
       const { latitude, longitude } = coords;
-      // const address = await fetchAddress(latitude, longitude);
-
-      const address="Address";
+      const address = 'Address'; // Replace with geocoding if needed
       const response = await checkIn({ lat: latitude, lng: longitude, address });
       toast.success(response.message || 'Checked in successfully!');
-      await fetchUser();
-
-      // Refresh attendance list for calendar update
-      const { start, end } = (() => {
-        const now = new Date();
-        const s = new Date(now.getFullYear(), now.getMonth(), 1)
-          .toISOString()
-          .split('T')[0];
-        const e = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-          .toISOString()
-          .split('T')[0];
-        return { start: s, end: e };
-      })();
-      const updated = await getMonthlyAttendance(start, end);
-      setAttendanceList(updated || []);
+      await fetchMonthlyAttendance();
+      await fetchUserAttendance(); // refresh today's attendance
     } catch (err) {
       console.error('Check-in error:', err);
       toast.error(err?.response?.data?.message || 'Check-in failed.');
@@ -214,27 +204,14 @@ const [leaveBalance, setLeaveBalance] = useState('');
     setIsProcessing(true);
     try {
       const { latitude, longitude } = coords;
-      const address = "Address Fetched!";
+      const address = 'Address Fetched!';
       const response = await checkOut({ lat: latitude, lng: longitude, address });
       const nowIso = new Date().toISOString();
       setCheckOutTime(nowIso);
       setCheckOutAddress(address);
       setHasCheckedOut(true);
       toast.success(response.message || 'Checked out successfully!');
-
-      // Refresh attendance list
-      const { start, end } = (() => {
-        const now = new Date();
-        const s = new Date(now.getFullYear(), now.getMonth(), 1)
-          .toISOString()
-          .split('T')[0];
-        const e = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-          .toISOString()
-          .split('T')[0];
-        return { start: s, end: e };
-      })();
-      const updated = await getMonthlyAttendance(start, end);
-      setAttendanceList(updated || []);
+      await fetchMonthlyAttendance();
     } catch (err) {
       console.error('Check-out error:', err);
       toast.error(err?.response?.data?.message || 'Check-out failed.');
@@ -253,13 +230,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
             isProcessing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          {isProcessing ? (
-            'Checking in...'
-          ) : (
-            <>
-              <LoginOutlinedIcon className="mr-2" /> Check In
-            </>
-          )}
+          {isProcessing ? 'Checking in...' : <><LoginOutlinedIcon className="mr-2" /> Check In</>}
         </button>
       );
     } else if (!hasCheckedOut) {
@@ -271,13 +242,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
             isProcessing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          {isProcessing ? (
-            'Checking out...'
-          ) : (
-            <>
-              <LogoutOutlinedIcon className="mr-2" /> Check Out
-            </>
-          )}
+          {isProcessing ? 'Checking out...' : <><LogoutOutlinedIcon className="mr-2" /> Check Out</>}
         </button>
       );
     } else {
@@ -298,7 +263,7 @@ const [leaveBalance, setLeaveBalance] = useState('');
   return (
     <>
       <ToastContainer />
-      <div className="min-h-screen p-2 bg-gray-50">
+     <div className="min-h-screen p-2 bg-gray-50">
         <h1 className="text-2xl bg-white p-3 mb-4">
           Welcome,{' '}
           <span className="font-bold">{user?.['First name'] || 'Employee'}</span> ! May your
@@ -365,54 +330,35 @@ const [leaveBalance, setLeaveBalance] = useState('');
             </div>
           )}
         </div>
-        <div className="flex flex-col md:flex-row justify-between">
-          <div className="bg-white p-4 max-w-[1000px] m-2 w-full rounded shadow-md">
-            <h2 className="text-lg font-bold mb-4">Attendance Calendar</h2>
-            <CalendarMonthView
-              attendance={attendanceList}
-             weekOffs={departmentWeekOffDays}
-              onDaySelect={(date) => {
-                const clickedDate = new Date(date).toISOString().split('T')[0];
-                const record = attendanceList.find((entry) => {
-                  const entryDate = new Date(entry.date).toISOString().split('T')[0];
-                  return entryDate === clickedDate;
-                });
 
-                setSelectedDate(new Date(date));
-                setSelectedDateRecord(record || null);
+        {/* Attendance Summary */}
+         <div className="flex flex-col md:flex-row justify-between">
+       
 
-                if (record) {
-                  toast.info(
-                    `Date: ${clickedDate}\nCheck-In: ${
-                      record.checkIn ? new Date(record.checkIn).toLocaleTimeString() : 'N/A'
-                    }\nCheck-Out: ${
-                      record.checkOut ? new Date(record.checkOut).toLocaleTimeString() : 'N/A'
-                    }`,
-                    { autoClose: 5000 }
-                  );
-                } else {
-                  toast.info(`No attendance record for ${clickedDate}`, { autoClose: 3000 });
-                }
-              }}
-            />
+        {/* Calendar */}
+        <div className="bg-white p-4 max-w-[1000px] m-2 w-full rounded shadow-md">
+          <CalendarMonthView
+            attendance={attendanceList}
+            weekOffs={departmentWeekOffDays}
+            onDaySelect={(date, record) => {
+              setSelectedDate(date);
+              setSelectedDateRecord(record);
+            }}
+            onMonthChange={handleMonthChange}
+          />
+        </div>
+     
+       <div className="bg-white p-4 max-w-[380px] flex flex-col md:flex-row  m-2 w-full rounded shadow-md">
+          <div className="text-center border p-3 rounded-lg flex-1 m-1 h-[130px]">
+            <span className="text-5xl font-bold">{attendanceList.length}</span>
+            <div className="text-xs mt-1">Total Attendance This Month</div>
           </div>
-          {/*  Total Attendance */}
-          <div className="bg-white p-4 max-w-[380px] m-2 w-full rounded shadow-md">
-            <h2 className="text-lg font-bold mb-4">Total Attendance</h2>
-            <div className="flex flex-row items-justify">
-            <p className="text-center flex flex-col border p-3 rounded-lg m-2">
-           <span className='text-5xl font-bold'> {attendanceList.length}</span>
-           <span className='text-xs'> Total Attendance For Month</span>   
-            </p>
-             <div className="flex flex-row items-justify">
-             <p className="text-center flex flex-col border p-3 m-2 rounded-lg ">
-            <span className='text-5xl font-bold' >{leaveBalance}</span>  
-            <span className='text-xs'>Total Leave Balance</span>
-            </p>
-            </div>
-           </div>
+          <div className="text-center border p-3 rounded-lg flex-1 m-1 h-[130px]">
+            <span className="text-5xl font-bold">{leaveBalance}</span>
+            <div className="text-xs mt-1">Total Leave Balance</div>
           </div>
         </div>
+         </div>
       </div>
     </>
   );
