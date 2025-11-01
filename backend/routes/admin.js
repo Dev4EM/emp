@@ -6,10 +6,11 @@ const Attendance = require('../models/Attendance');
 const Leave = require('../models/Leave');
 const mongoose = require('mongoose');
 const { Parser: Json2csvParser } = require('json2csv');
-
+const moment = require('moment-timezone');
 function normalizeToDay(date = new Date()) {
-  const dayString = date.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-  const dayDate = new Date(dayString + 'T00:00:00.000Z'); // UTC midnight
+  const tzDate = moment(date).tz('Asia/Kolkata'); // Pune/Kothrud timezone
+  const dayString = tzDate.format('YYYY-MM-DD');
+  const dayDate = tzDate.startOf('day').toDate();
   return { dayString, dayDate };
 }
 
@@ -105,8 +106,9 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
         records.push({
           Employee: `${firstName} ${lastName}`.trim(),
           Date: a.date ? a.date.toISOString().split('T')[0] : '',
-          'Check-in': (a.updatedCheckIn || a.checkIn) ? (a.updatedCheckIn || a.checkIn).toISOString() : '',
-          'Check-out': (a.updatedCheckOut || a.checkOut) ? (a.updatedCheckOut || a.checkOut).toISOString() : '',
+          
+            'Check-in': (a.updatedCheckIn || a.checkIn) ? moment(a.updatedCheckIn || a.checkIn).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm') : '',
+            'Check-out': (a.updatedCheckOut || a.checkOut) ? moment(a.updatedCheckOut || a.checkOut).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm') : '',
           'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
           Status: status || 'Unknown'
         });
