@@ -136,7 +136,11 @@ function HomePage() {
 
 const fetchMonthlyAttendance = async (year, month) => {
   try {
-    const { start, end } = getCalendarDateRange(year, month);
+    const now = new Date();
+    const activeYear = year ?? now.getFullYear();
+    const activeMonth = month ?? now.getMonth();
+    const { start, end } = getCalendarDateRange(activeYear, activeMonth);
+
     const attendance = await getMonthlyAttendance(start, end);
     setAttendanceList(attendance || []);
   } catch (err) {
@@ -144,6 +148,7 @@ const fetchMonthlyAttendance = async (year, month) => {
     toast.error('Failed to load attendance.');
   }
 };
+
 
 
 const handleMonthChange = async (date) => {
@@ -170,31 +175,56 @@ const handleMonthChange = async (date) => {
     const minutes = Math.floor((diffMs % 3600000) / 60000);
     return `${hours}h ${minutes}m`;
   };
+  const fetchTodayAttendance = async () => {
+  try {
+    const todayAttendance = await getTodayAttendance();
+    if (Array.isArray(todayAttendance) && todayAttendance.length > 0) {
+      const record = todayAttendance[0];
+
+      if (record.checkIn) {
+        setCheckInTime(record.checkIn);
+        setHasCheckedIn(true);
+        setCheckInAddress(record.checkInLocation?.address || 'N/A');
+      }
+
+      if (record.checkOut) {
+        setCheckOutTime(record.checkOut);
+        setHasCheckedOut(true);
+        setCheckOutAddress(record.checkOutLocation?.address || 'N/A');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch today’s attendance', err);
+    toast.error('Failed to fetch today’s attendance.');
+  }
+};
+
 
   const handleCheckIn = async () => {
-    if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
-      toast.error('Location is required to check in.');
-      return;
-    }
-    if (hasCheckedIn) {
-      toast.info('You have already checked in.');
-      return;
-    }
-    setIsProcessing(true);
-    try {
-      const { latitude, longitude } = coords;
-      const address = 'Address'; // Replace with geocoding if needed
-      const response = await checkIn({ lat: latitude, lng: longitude, address });
-      toast.success(response.message || 'Checked in successfully!');
-      await fetchMonthlyAttendance();
-      await fetchUserAttendance(); // refresh today's attendance
-    } catch (err) {
-      console.error('Check-in error:', err);
-      toast.error(err?.response?.data?.message || 'Check-in failed.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
+    toast.error('Location is required to check in.');
+    return;
+  }
+  if (hasCheckedIn) {
+    toast.info('You have already checked in.');
+    return;
+  }
+  setIsProcessing(true);
+  try {
+    const { latitude, longitude } = coords;
+    const address = 'Address';
+    const response = await checkIn({ lat: latitude, lng: longitude, address });
+    toast.success(response.message || 'Checked in successfully!');
+    await fetchMonthlyAttendance();
+    await fetchTodayAttendance(); // ✅ fixed
+  } catch (err) {
+    console.error('Check-in error:', err);
+    toast.error(err?.response?.data?.message || 'Check-in failed.');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
 
   const handleCheckOut = async () => {
     if (!isGeolocationAvailable || !isGeolocationEnabled || !coords) {
