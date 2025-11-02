@@ -75,9 +75,8 @@ function calculateAttendanceStatus(checkIn, checkOut, updatedCheckIn, updatedChe
  */
 router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
   try {
-    console.log('Generating CSV of all attendance...');
+    console.log('Generating CSV of all attendance with leave data...');
 
-    // Fetch all users (only needed name fields)
     const users = await User.find({}, {
       _id: 1,
       'First name': 1,
@@ -88,39 +87,67 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
 
     const records = [];
 
-    // For each user, fetch attendance records and prepare CSV rows
     for (const user of users) {
+      // Fetch all attendance and leave records
       const attendanceRecords = await Attendance.find({ employeeId: user._id });
+      const leaveRecords = await Leave.find({ employeeId: user._id });
 
-      attendanceRecords.forEach(a => {
-        const { totalHours, status } = calculateAttendanceStatus(
-          a.checkIn,
-          a.checkOut,
-          a.updatedCheckIn,
-          a.updatedCheckOut
-        );
+      // Create a map of leaves by date (array to handle multiple leaves per day)
+      const leaveMap = {};
+      leaveRecords.forEach(l => {
+        const dateKey = l.date.toISOString().split('T')[0];
+        if (!leaveMap[dateKey]) leaveMap[dateKey] = [];
+        leaveMap[dateKey].push(l);
+      });
+
+      // Collect all unique dates from attendance and leave
+      const allDates = new Set([
+        ...attendanceRecords.map(a => a.date.toISOString().split('T')[0]),
+        ...leaveRecords.map(l => l.date.toISOString().split('T')[0])
+      ]);
+
+      for (const dateKey of allDates) {
+        const attendance = attendanceRecords.find(a => a.date.toISOString().split('T')[0] === dateKey);
+        const leaves = leaveMap[dateKey] || [];
+
+        const { totalHours, status } = attendance
+          ? calculateAttendanceStatus(attendance.checkIn, attendance.checkOut, attendance.updatedCheckIn, attendance.updatedCheckOut)
+          : { totalHours: 0, status: 'No Attendance' };
 
         const firstName = user['First name'] || user.firstName || 'Unknown';
         const lastName = user['Last name'] || user.lastName || 'User';
 
+        // If multiple leaves on the same day, join them as comma-separated
+        const leaveTypes = leaves.map(l => l.type).join(', ') || 'None';
+        const leaveDurations = leaves.map(l => l.duration).join(', ') || 0;
+        const halfLeaves = leaves.map(l => l.half || 'Full').join(', ') || 'Full';
+        const leaveStatuses = leaves.map(l => l.status).join(', ') || 'N/A';
+
         records.push({
           Employee: `${firstName} ${lastName}`.trim(),
-          Date: a.date ? a.date.toISOString().split('T')[0] : '',
-          
-            'Check-in': (a.updatedCheckIn || a.checkIn) ? moment(a.updatedCheckIn || a.checkIn).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm') : '',
-            'Check-out': (a.updatedCheckOut || a.checkOut) ? moment(a.updatedCheckOut || a.checkOut).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm') : '',
+          Date: dateKey,
+          'Check-in': attendance && (attendance.updatedCheckIn || attendance.checkIn)
+            ? moment(attendance.updatedCheckIn || attendance.checkIn).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm')
+            : '',
+          'Check-out': attendance && (attendance.updatedCheckOut || attendance.checkOut)
+            ? moment(attendance.updatedCheckOut || attendance.checkOut).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm')
+            : '',
           'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-          Status: status || 'Unknown'
+          Status: status || 'Unknown',
+          'Leave Type': leaveTypes,
+          'Leave Duration': leaveDurations,
+          'Half': halfLeaves,
+          'Leave Status': leaveStatuses
         });
-      });
+      }
     }
 
-    const fields = ['Employee', 'Date', 'Check-in', 'Check-out', 'Total Hours', 'Status'];
+    const fields = ['Employee', 'Date', 'Check-in', 'Check-out', 'Total Hours', 'Status', 'Leave Type', 'Leave Duration', 'Half', 'Leave Status'];
     const json2csv = new Json2csvParser({ fields });
     const csv = json2csv.parse(records);
 
     res.header('Content-Type', 'text/csv');
-    res.attachment('all_employees_attendance.csv');
+    res.attachment('all_employees_attendance_with_leave.csv');
     return res.send(csv);
 
   } catch (err) {
@@ -128,6 +155,7 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 /**
  * ROUTE: GET /attendance/:employeeId/csv
