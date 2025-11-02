@@ -49,22 +49,37 @@ const handleAddLeave = async () => {
     return;
   }
 
+  // Parse duration and half
+  let duration = 1;
+  let half = null;
+
+  if (typeof newLeave.duration === 'string' && newLeave.duration.startsWith('0.5')) {
+    duration = 0.5;
+    half = newLeave.duration.split('-')[1]; // "first" or "second"
+  }
+
+  const payload = {
+    date: newLeave.date,
+    type: newLeave.type,
+    duration,
+    half,
+    reason: newLeave.reason
+  };
+
   try {
-    // API call to add past leave
-    const response = await applyPastLeave(newLeave);
+    const response = await applyPastLeave(payload);
 
     // Update UI
     setLeaves(prev => [response.data.leave, ...prev]);
 
     toast.success('Past leave added successfully!');
-
-    // Close modal
     closeAddLeaveModal();
   } catch (err) {
     console.error(err);
     toast.error(err.response?.data?.message || 'Failed to add past leave.');
   }
 };
+
 
   const fetchLeaves = async (page) => {
     setIsLoading(true);
@@ -195,13 +210,14 @@ const handleAddLeave = async () => {
     <div>
       <label className="block text-sm text-gray-100 mb-1">Duration</label>
       <select
-        value={newLeave.duration}
-        onChange={(e) => handleNewLeaveChange('duration', Number(e.target.value))}
-        className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
-      >
-        <option value={1}>Full Day</option>
-        <option value={0.5}>Half Day</option>
-      </select>
+  value={newLeave.duration}
+  onChange={(e) => handleNewLeaveChange('duration', e.target.value)}
+  className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
+>
+  <option value="1">Full Day</option>
+  <option value="0.5-first">Half Day - First Half</option>
+  <option value="0.5-second">Half Day - Second Half</option>
+</select>
     </div>
 
     <div>

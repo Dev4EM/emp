@@ -64,19 +64,30 @@ useEffect(() => {
 };
 
 
-  const handleDateDetailsChange = (dateString, field, value) => {
-    setDateDetails(currentDetails => {
-      const newDetails = { ...currentDetails };
-      if (!newDetails[dateString]) {
-        newDetails[dateString] = { duration: 1, half: null };
-      }
-      newDetails[dateString][field] = value;
-      if (field === 'duration' && value === 1) {
-        newDetails[dateString].half = null;
-      }
-      return newDetails;
-    });
-  };
+ const handleDateDetailsChange = (dateString, field, value) => {
+  setDateDetails(currentDetails => {
+    const newDetails = { ...currentDetails };
+    if (!newDetails[dateString]) {
+      newDetails[dateString] = { duration: 1, half: null };
+    }
+
+    // Update the changed field
+    newDetails[dateString][field] = value;
+
+    // If full day → remove half
+    if (field === 'duration' && value === 1) {
+      newDetails[dateString].half = null;
+    }
+
+    // ✅ If switching to half-day and no half selected, default to "first"
+    if (field === 'duration' && value === 0.5 && !newDetails[dateString].half) {
+      newDetails[dateString].half = 'first';
+    }
+
+    return newDetails;
+  });
+};
+
 
   const clearAllDates = () => {
     setSelectedDates([]);
