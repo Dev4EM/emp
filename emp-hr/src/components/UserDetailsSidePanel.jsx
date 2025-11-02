@@ -297,8 +297,18 @@ function UserDetailsSidePanel({ user, isOpen, onClose, onUserUpdate }) {
               </div>
 
               {isLeaveBalanceModalOpen && (
-                <LeaveBalanceModal user={user} onClose={closeLeaveBalanceModal} onUserUpdate={onUserUpdate} />
-              )}
+  <LeaveBalanceModal
+    user={user}
+    onClose={closeLeaveBalanceModal}
+    onUserUpdate={(updatedUser) => {
+      onUserUpdate(updatedUser); 
+      if (updatedUser?._id === user?._id) {
+        Object.assign(user, updatedUser);
+      }
+    }}
+  />
+)}
+
             </div>
           </div>
         </div>

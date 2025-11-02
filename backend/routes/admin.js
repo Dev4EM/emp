@@ -345,7 +345,60 @@ router.get('/all-users', auth, checkAdmin, async (req, res) => {
     });
   }
 });
+router.put('/attendance/leave-balance/:id', auth, checkAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paidLeaveBalance, isLeaveApplicable } = req.body; // strings
 
+    console.log('Updating Leave Balance for User:', id);
+    console.log('Request Body:', req.body);
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    // Validate input
+    if (paidLeaveBalance === undefined && isLeaveApplicable === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one field (paidLeaveBalance or isLeaveApplicable) is required',
+      });
+    }
+
+    const updateData = {};
+
+    // ✅ Keep all data as string — no type conversion
+    if (paidLeaveBalance !== undefined && paidLeaveBalance !== '') {
+      updateData.paidLeaveBalance = paidLeaveBalance;
+    }
+
+    if (isLeaveApplicable !== undefined && isLeaveApplicable !== '') {
+      updateData.isLeaveApplicable = isLeaveApplicable;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Leave balance updated successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Error updating leave balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating leave balance',
+      error: error.message,
+    });
+  }
+});
 /**
  * ROUTE: PUT /assign-reporting-manager
  */
@@ -631,6 +684,7 @@ router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
         userShift: user.Shift || 'No',
         department: user.Department || '',
         paidLeaveBalance: user.paidLeaveBalance || 0,
+         isLeaveApplicable: user.isLeaveApplicable || "false",
         attendance: formattedAttendance,
         leaves: formattedLeaves  // ✅ Added leave data here
       };

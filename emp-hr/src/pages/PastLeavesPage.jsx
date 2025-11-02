@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPastLeaves , cancelLeave } from '../components/Api';
+import { getPastLeaves , cancelLeave,applyPastLeave } from '../components/Api';
 import { toast, ToastContainer } from 'react-toastify';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -24,6 +24,47 @@ function PastLeavesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [leaveToCancel, setLeaveToCancel] = useState(null);
+const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+const [newLeave, setNewLeave] = useState({
+  date: '',
+  type: 'paid',
+  duration: 1,
+  reason: ''
+});
+const openAddLeaveModal = () => {
+  setNewLeave({ date: '', type: 'paid', duration: 1, reason: '' });
+  setIsAddModalOpen(true);
+};
+
+const closeAddLeaveModal = () => {
+  setIsAddModalOpen(false);
+};
+
+const handleNewLeaveChange = (field, value) => {
+  setNewLeave(prev => ({ ...prev, [field]: value }));
+};
+const handleAddLeave = async () => {
+  if (!newLeave.date) {
+    toast.error('Please select a date.');
+    return;
+  }
+
+  try {
+    // API call to add past leave
+    const response = await applyPastLeave(newLeave);
+
+    // Update UI
+    setLeaves(prev => [response.data.leave, ...prev]);
+
+    toast.success('Past leave added successfully!');
+
+    // Close modal
+    closeAddLeaveModal();
+  } catch (err) {
+    console.error(err);
+    toast.error(err.response?.data?.message || 'Failed to add past leave.');
+  }
+};
 
   const fetchLeaves = async (page) => {
     setIsLoading(true);
@@ -107,9 +148,73 @@ function PastLeavesPage() {
   return (
     <div className="p-8 bg-white text-black min-h-screen">
       <ToastContainer theme="colored" />
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto ">
         <div className="mb-8">
+           <div className="flex flex-col md:flex-row justify-between mb-10">
           <h1 className="text-4xl font-bold text-emerald-900 mb-4">My Past Leaves</h1>
+         
+  <button
+    onClick={openAddLeaveModal}
+    className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+  >
+    Add Past Leave
+  </button>
+</div>
+<Modal
+  isOpen={isAddModalOpen}
+  onClose={closeAddLeaveModal}
+  onConfirm={handleAddLeave}
+  title="Add Past Leave"
+  className="bg-white"
+>
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm text-gray-100 mb-1">Leave Date</label>
+      <input
+        type="date"
+        max={new Date().toISOString().split('T')[0]} // cannot select future dates
+        value={newLeave.date}
+        onChange={(e) => handleNewLeaveChange('date', e.target.value)}
+        className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
+        
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm text-gray-100 mb-1">Leave Type</label>
+      <select
+        value={newLeave.type}
+        onChange={(e) => handleNewLeaveChange('type', e.target.value)}
+        className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
+      >
+        <option value="paid">Paid</option>
+        <option value="unpaid">Unpaid</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="block text-sm text-gray-100 mb-1">Duration</label>
+      <select
+        value={newLeave.duration}
+        onChange={(e) => handleNewLeaveChange('duration', Number(e.target.value))}
+        className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
+      >
+        <option value={1}>Full Day</option>
+        <option value={0.5}>Half Day</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="block text-sm text-gray-100 mb-1">Reason</label>
+      <textarea
+        value={newLeave.reason}
+        onChange={(e) => handleNewLeaveChange('reason', e.target.value)}
+        className="w-full px-3 py-2 border rounded bg-gray-600 text-white"
+      />
+    </div>
+  </div>
+</Modal>
+
 
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

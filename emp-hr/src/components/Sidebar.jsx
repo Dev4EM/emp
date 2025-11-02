@@ -17,7 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import useLogout from '../pages/Logout';
 import Modal from './Modal';
 import useUser from '../hooks/useUser';
-import { UpdateRounded,WorkHistorySharp } from '@mui/icons-material';
+import { UpdateRounded, WorkHistorySharp, WorkSharp, WorkspacePremium } from '@mui/icons-material';
 
 const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
   const logout = useLogout();
@@ -124,7 +124,7 @@ const Sidebar = ({ isSidebarOpen, onCloseSidebar }) => {
             <Item to="/my-attendance" icon={CalendarViewMonthOutlinedIcon} text="Attendance" />
             <Item to="/past-leaves" icon={HistoryOutlinedIcon} text="Past Leaves" />
             <Item to="/profile" icon={AccountCircleOutlinedIcon} text="Profile" />
-             <Item to="/workshop" icon={WorkHistorySharp} text="Workshop" />
+            <Item to="/workshop" icon={WorkHistorySharp} text="Workshop" />
           </div>
 
           {/* Team leader */}
