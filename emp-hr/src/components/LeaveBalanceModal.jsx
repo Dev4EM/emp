@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { updateLeaveBalance } from './Api';
 import { FaCheckCircle, FaRegCircle } from 'react-icons/fa'; // ✅ and empty circle
-
+import { useNavigate } from 'react-router-dom'; 
 function LeaveBalanceModal({ user, onClose, onUserUpdate }) {
 console.log("users data is:",user)
   const [localUser, setLocalUser] = useState(user || {});
   const [leaveBalance, setLeaveBalance] = useState(String(user?.paidLeaveBalance || '0'));
   const [isLeaveApplicable, setIsLeaveApplicable] = useState(user?.isLeaveApplicable || "false");
   const [isLoading, setIsLoading] = useState(false);
-
+const navigate = useNavigate(); 
   // Sync local state when user changes (if modal reopened)
   useEffect(() => {
     if (user?._id) {
@@ -40,10 +40,12 @@ console.log("users data is:",user)
 
       onUserUpdate(updatedUser);
       toast.success('Leave settings updated successfully!');
+       navigate('/admin');
       onClose();
     } catch (error) {
       console.error('Error updating leave balance:', error);
       toast.error(error.message || 'Failed to update leave balance.');
+       navigate('/admin');
     } finally {
       setIsLoading(false);
     }
