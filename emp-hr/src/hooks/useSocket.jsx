@@ -26,7 +26,7 @@ export const SocketProvider = ({ children }) => {
         return;
       }
 
-      const newSocket = io( 'https://api1.empeople.esromagica.in', {
+      const newSocket = io( 'https://api.empeople.spacecrats.com', {
         auth: {
           token: token
         },
