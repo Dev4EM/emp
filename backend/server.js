@@ -22,7 +22,7 @@ const cron = require('node-cron');
 // Setup Socket.IO with CORS
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "https://empeople.esromagica.in",
+    origin: process.env.FRONTEND_URL || "https://empeople.spacecrats.com",
     methods: ["GET", "POST"],
     credentials: true
   }
