@@ -293,8 +293,8 @@ export const updateAttendance = async (payload) => {
   return handleApiRequest(() => API.put(`/user/attendance/update`, payload));
 };
 
-export const updateLeaveBalance = async (userId, leaveBalance) => {
-  return handleApiRequest(() => API.put(`/admin/attendance/leave-balance/${userId}`, { leaveBalance }));
+export const updateLeaveBalance = async (userId, data) => {
+  return handleApiRequest(() => API.put(`/admin/attendance/leave-balance/${userId}`, data));
 };
 
 export const assignReportingManager = async (data) => {
@@ -372,5 +372,6 @@ export const deleteSession = async (sessionId) => {
   return response.data;
 };
 
+export const applyPastLeave = (leaveData) => API.post('/employee/leave/past', leaveData);
 
 export default API;

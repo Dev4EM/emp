@@ -6,10 +6,11 @@ const Attendance = require('../models/Attendance');
 const Leave = require('../models/Leave');
 const mongoose = require('mongoose');
 const { Parser: Json2csvParser } = require('json2csv');
-
+const moment = require('moment-timezone');
 function normalizeToDay(date = new Date()) {
-  const dayString = date.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-  const dayDate = new Date(dayString + 'T00:00:00.000Z'); // UTC midnight
+  const tzDate = moment(date).tz('Asia/Kolkata'); // Pune/Kothrud timezone
+  const dayString = tzDate.format('YYYY-MM-DD');
+  const dayDate = tzDate.startOf('day').toDate();
   return { dayString, dayDate };
 }
 
@@ -74,9 +75,8 @@ function calculateAttendanceStatus(checkIn, checkOut, updatedCheckIn, updatedChe
  */
 router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
   try {
-    console.log('Generating CSV of all attendance...');
+    console.log('Generating CSV of all attendance with leave data...');
 
-    // Fetch all users (only needed name fields)
     const users = await User.find({}, {
       _id: 1,
       'First name': 1,
@@ -87,38 +87,67 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
 
     const records = [];
 
-    // For each user, fetch attendance records and prepare CSV rows
     for (const user of users) {
+      // Fetch all attendance and leave records
       const attendanceRecords = await Attendance.find({ employeeId: user._id });
+      const leaveRecords = await Leave.find({ employeeId: user._id });
 
-      attendanceRecords.forEach(a => {
-        const { totalHours, status } = calculateAttendanceStatus(
-          a.checkIn,
-          a.checkOut,
-          a.updatedCheckIn,
-          a.updatedCheckOut
-        );
+      // Create a map of leaves by date (array to handle multiple leaves per day)
+      const leaveMap = {};
+      leaveRecords.forEach(l => {
+        const dateKey = l.date.toISOString().split('T')[0];
+        if (!leaveMap[dateKey]) leaveMap[dateKey] = [];
+        leaveMap[dateKey].push(l);
+      });
+
+      // Collect all unique dates from attendance and leave
+      const allDates = new Set([
+        ...attendanceRecords.map(a => a.date.toISOString().split('T')[0]),
+        ...leaveRecords.map(l => l.date.toISOString().split('T')[0])
+      ]);
+
+      for (const dateKey of allDates) {
+        const attendance = attendanceRecords.find(a => a.date.toISOString().split('T')[0] === dateKey);
+        const leaves = leaveMap[dateKey] || [];
+
+        const { totalHours, status } = attendance
+          ? calculateAttendanceStatus(attendance.checkIn, attendance.checkOut, attendance.updatedCheckIn, attendance.updatedCheckOut)
+          : { totalHours: 0, status: 'No Attendance' };
 
         const firstName = user['First name'] || user.firstName || 'Unknown';
         const lastName = user['Last name'] || user.lastName || 'User';
 
+        // If multiple leaves on the same day, join them as comma-separated
+        const leaveTypes = leaves.map(l => l.type).join(', ') || 'None';
+        const leaveDurations = leaves.map(l => l.duration).join(', ') || 0;
+        const halfLeaves = leaves.map(l => l.half || 'Full').join(', ') || 'Full';
+        const leaveStatuses = leaves.map(l => l.status).join(', ') || 'N/A';
+
         records.push({
           Employee: `${firstName} ${lastName}`.trim(),
-          Date: a.date ? a.date.toISOString().split('T')[0] : '',
-          'Check-in': (a.updatedCheckIn || a.checkIn) ? (a.updatedCheckIn || a.checkIn).toISOString() : '',
-          'Check-out': (a.updatedCheckOut || a.checkOut) ? (a.updatedCheckOut || a.checkOut).toISOString() : '',
+          Date: dateKey,
+          'Check-in': attendance && (attendance.updatedCheckIn || attendance.checkIn)
+            ? moment(attendance.updatedCheckIn || attendance.checkIn).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm')
+            : '',
+          'Check-out': attendance && (attendance.updatedCheckOut || attendance.checkOut)
+            ? moment(attendance.updatedCheckOut || attendance.checkOut).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm')
+            : '',
           'Total Hours': totalHours ? totalHours.toFixed(2) : '0.00',
-          Status: status || 'Unknown'
+          Status: status || 'Unknown',
+          'Leave Type': leaveTypes,
+          'Leave Duration': leaveDurations,
+          'Half': halfLeaves,
+          'Leave Status': leaveStatuses
         });
-      });
+      }
     }
 
-    const fields = ['Employee', 'Date', 'Check-in', 'Check-out', 'Total Hours', 'Status'];
+    const fields = ['Employee', 'Date', 'Check-in', 'Check-out', 'Total Hours', 'Status', 'Leave Type', 'Leave Duration', 'Half', 'Leave Status'];
     const json2csv = new Json2csvParser({ fields });
     const csv = json2csv.parse(records);
 
     res.header('Content-Type', 'text/csv');
-    res.attachment('all_employees_attendance.csv');
+    res.attachment('all_employees_attendance_with_leave.csv');
     return res.send(csv);
 
   } catch (err) {
@@ -126,6 +155,7 @@ router.get('/attendance/all/csv', auth, checkAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 /**
  * ROUTE: GET /attendance/:employeeId/csv
@@ -343,7 +373,60 @@ router.get('/all-users', auth, checkAdmin, async (req, res) => {
     });
   }
 });
+router.put('/attendance/leave-balance/:id', auth, checkAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paidLeaveBalance, isLeaveApplicable } = req.body; // strings
 
+    console.log('Updating Leave Balance for User:', id);
+    console.log('Request Body:', req.body);
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    // Validate input
+    if (paidLeaveBalance === undefined && isLeaveApplicable === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one field (paidLeaveBalance or isLeaveApplicable) is required',
+      });
+    }
+
+    const updateData = {};
+
+    // ✅ Keep all data as string — no type conversion
+    if (paidLeaveBalance !== undefined && paidLeaveBalance !== '') {
+      updateData.paidLeaveBalance = paidLeaveBalance;
+    }
+
+    if (isLeaveApplicable !== undefined && isLeaveApplicable !== '') {
+      updateData.isLeaveApplicable = isLeaveApplicable;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Leave balance updated successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Error updating leave balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating leave balance',
+      error: error.message,
+    });
+  }
+});
 /**
  * ROUTE: PUT /assign-reporting-manager
  */
@@ -629,6 +712,7 @@ router.get('/Dashb-all-users', auth, checkAdmin, async (req, res) => {
         userShift: user.Shift || 'No',
         department: user.Department || '',
         paidLeaveBalance: user.paidLeaveBalance || 0,
+         isLeaveApplicable: user.isLeaveApplicable || "false",
         attendance: formattedAttendance,
         leaves: formattedLeaves  // ✅ Added leave data here
       };

@@ -326,5 +326,72 @@ router.get('/attendance/history', auth, async (req, res) => {
     return res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+// POST /api/employee/leave/past
+router.post('/leave/past', auth, async (req, res) => {
+  try {
+    const { date: leaveDate, type: leaveType, duration: leaveDuration, half: leaveHalf, reason } = req.body;
+
+    // Validate mandatory fields
+    if (!leaveDate || !leaveType || !leaveDuration || !reason) {
+      return res.status(400).json({ message: 'Required fields: date, type, duration, reason' });
+    }
+    if (!['paid','unpaid'].includes(leaveType)) {
+      return res.status(400).json({ message: 'Invalid leave type' });
+    }
+    if (![1, 0.5].includes(leaveDuration)) {
+      return res.status(400).json({ message: 'Invalid duration' });
+    }
+    if (leaveDuration === 0.5 && (leaveHalf !== 'first' && leaveHalf !== 'second')) {
+      return res.status(400).json({ message: 'For half-day, half must be "first" or "second"' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const day = new Date(leaveDate);
+    const normalizedDate = new Date(day.toISOString().split('T')[0] + 'T00:00:00.000Z');
+
+    const existing = await Leave.findOne({ employeeId: user._id, date: normalizedDate });
+    if (existing) {
+      return res.status(400).json({ message: 'Leave already exists for this date' });
+    }
+
+    let finalLeaveType = leaveType;
+
+    // Switch to unpaid if insufficient paid leave balance
+    if (leaveType === 'paid' && user.paidLeaveBalance < leaveDuration) {
+      finalLeaveType = 'unpaid';
+    }
+
+    const leave = new Leave({
+      employeeId: user._id,
+      date: normalizedDate,
+      type: finalLeaveType,
+      duration: leaveDuration,
+      half: leaveDuration === 0.5 ? leaveHalf : null,
+      reason,
+      status: 'approved' // automatically approved for past leave
+    });
+
+    await leave.save();
+
+    // Deduct paid leave balance if applicable
+    if (finalLeaveType === 'paid') {
+      user.paidLeaveBalance -= leaveDuration;
+      await user.save();
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      message: `Past leave recorded successfully (${finalLeaveType})`, 
+      leave 
+    });
+
+  } catch (err) {
+    console.error('Error in /leave/past:', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 
 module.exports = router;

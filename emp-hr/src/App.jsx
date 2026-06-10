@@ -21,6 +21,8 @@ import TeamAttendancePage from './pages/TeamAttendancePage';
 import ManageAppPage from './pages/ManageAppPage';
 import AddUserPage from './pages/AddUserPage';
 import UpdateAttendance from './pages/UpdateAttendance.jsx';
+import Workshop from './pages/Workshop.jsx';
+import Batches from './pages/Batches.jsx';
  
 // A component to conditionally render the layout
 const AppContent = () => {
@@ -54,6 +56,8 @@ const AppContent = () => {
               <Route path="/team-attendance" element={<TeamAttendancePage />} />
               <Route path="/manage-app" element={<ManageAppPage />} />
               <Route path="/update-attendance" element={<UpdateAttendance />} />
+               <Route path="/workshop" element={<Workshop />} />
+              <Route path="/batches/:programId" element={<Batches/>}/>
             </Route>
 
           </Routes>
