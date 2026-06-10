@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://api.empeople.spacecrats.com//api';
+const API_BASE_URL = 'https://api.empeople.spacecrats.com/api';
 
 
 // This function will handle the actual API request logic
